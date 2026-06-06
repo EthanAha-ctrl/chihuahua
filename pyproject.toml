@@ -1,0 +1,14 @@
+[project]
+name = "chihuahua-endpoint-geometry"
+version = "0.1.0"
+description = "Lightweight endpoint geometry and pygame visualization for a yaw/pitch-waist quadruped."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "matplotlib>=3.9",
+    "numpy>=2.0",
+    "pygame>=2.6",
+    "pyyaml>=6.0.3",
+]
+
+[tool.uv]
+package = false

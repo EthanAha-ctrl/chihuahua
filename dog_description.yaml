@@ -1,0 +1,168 @@
+# Link-only dog/robot description for the endpoint geometry viewer.
+# No physics. No contact model. No controller. No solid body rendering.
+
+name: digitigrade_yaw_pitch_waist_dog
+
+sources:
+  mixed_breed_limb_bones:
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8280978/"
+    summary: >
+      Mixed breed dog long-bone data, not Chihuahua-specific. Reported
+      left/right lengths: humerus 16.93/17.55 cm, radius 18.30/18.15 cm,
+      femur 19.02/19.40 cm, tibia 18.90/20.03 cm. No toe/metacarpal/
+      metatarsal/phalange segment length is provided.
+  chihuahua_joint_motion:
+    url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5098946"
+    summary: >
+      Chihuahua study found, but it is Grade III medial patellar luxation,
+      not a complete healthy Chihuahua baseline for all leg joints.
+  general_canine_rom:
+    url: "https://catalogimages.wiley.com/images/db/pdf/9781118711361.excerpt.pdf"
+    summary: >
+      General canine passive ROM fallback. Table 1.2 reports hip, stifle,
+      tarsus, shoulder, elbow, and carpus flexion/extension values.
+  small_breed_rom_cross_check:
+    url: "https://www.frontiersin.org/articles/10.3389/fvets.2019.00424/full"
+    summary: >
+      Healthy French Bulldog goniometry cross-check: hip ROM about 121-123
+      deg, stifle ROM about 114-115 deg, tarsus ROM about 149 deg.
+  unitree_go2_fallback:
+    url: "https://github.com/unitreerobotics/unitree_ros/blob/master/robots/go2_description/urdf/go2_description.urdf"
+    summary: >
+      Robot fallback only. Go2 has hip/thigh/calf revolute limits, but its
+      foot joint is fixed, so it is not a source for our distal endpoint joint.
+  canine_cervical_note:
+    url: "https://pubmed.ncbi.nlm.nih.gov/2263970/"
+    summary: >
+      Canine cervical cadaver study reports intact C4-C5 flexion-extension ROM
+      of 24.5 +/- 6.6 deg at 1 N-m. This is one vertebral motion unit, not a
+      complete healthy Chihuahua whole-neck ROM.
+  digitigrade_endpoint_note:
+    url: "https://www.britannica.com/science/digitigrade-posture"
+    summary: >
+      Dogs and cats are digitigrade: only the phalanges touch while ankle/wrist
+      are elevated. This is the intended analogy for the robot distal endpoint
+      joint, not a tarsus/hock joint.
+
+geometry:
+  body_length_total_m:
+    visual_tuning: true
+    value: 0.64
+  front_body_fraction:
+    visual_tuning: true
+    value: 0.5
+  waist_joint_spacing_m:
+    visual_tuning: true
+    value: 0.08
+  body_half_width_m:
+    visual_tuning: false
+    value: 0.075
+  hip_half_width_m:
+    visual_tuning: false
+    value: 0.105
+  foot_x_offset_m:
+    visual_tuning: false
+    value: 0.0
+  foot_lateral_outset_m:
+    visual_tuning: false
+    value: 0.045
+  min_reach_xy_m:
+    visual_tuning: false
+    value: 0.015
+  max_reach_xy_m:
+    visual_tuning: false
+    value: 0.165
+  min_foot_clearance_m:
+    visual_tuning: false
+    value: 0.080
+
+viewer:
+  body_z_m:
+    visual_tuning: false
+    value: 0.245
+  links_m:
+    upper:
+      visual_tuning: false
+      value: 0.105
+    lower:
+      visual_tuning: false
+      value: 0.112
+    distal_endpoint:
+      visual_tuning: false
+      value: 0.045
+  head_claw:
+    root_forward_m:
+      visual_tuning: false
+      value: 0.038
+    root_up_m:
+      visual_tuning: false
+      value: 0.014
+    neck_length_m:
+      visual_tuning: false
+      value: 0.078
+    hinge_half_gap_m:
+      visual_tuning: false
+      value: 0.012
+    jaw_length_m:
+      visual_tuning: false
+      value: 0.058
+
+# These are drawing ranges for constrained periodic motion.
+# Goniometry sources report included joint angles; this viewer uses simple
+# drawing bend angles. The distal endpoint joint is a robot digitigrade
+# toe/paw-style link, not a sourced canine phalange ROM.
+joint_ranges_deg:
+  waist_yaw:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 24.0
+    min_deg: -45.0
+    max_deg: 45.0
+  waist_pitch:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 14.0
+    min_deg: -25.0
+    max_deg: 25.0
+  hip_ab:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 24.0
+    min_deg: -32.0
+    max_deg: 32.0
+  hip_pitch:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 42.0
+    min_deg: -55.0
+    max_deg: 55.0
+  knee_bend:
+    visual_tuning: false
+    bias_deg: 68.0
+    amp_deg: 52.0
+    min_deg: 10.0
+    max_deg: 135.0
+  toe_bend:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 105.0
+    min_deg: -110.0
+    max_deg: 110.0
+  neck_yaw:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 30.0
+    min_deg: -55.0
+    max_deg: 55.0
+  neck_pitch:
+    visual_tuning: false
+    bias_deg: 0.0
+    amp_deg: 22.0
+    min_deg: -35.0
+    max_deg: 35.0
+  head_claw:
+    visual_tuning: false
+    bias_deg: 8.0
+    amp_deg: 18.0
+    min_deg: -22.0
+    max_deg: 28.0
