@@ -1,0 +1,87 @@
+# Stage 1 battery and electronics placeholders.
+# Placement is expressed in the robot world frame used by endpoint_geometry.py.
+
+default_battery: lipo_3s_1500mah
+
+batteries:
+  lipo_2s_850mah:
+    mass_kg: 0.052
+    dimensions_m:
+      x: 0.060
+      y: 0.031
+      z: 0.017
+    nominal_voltage_v: 7.4
+    usable_capacity_wh: 5.0
+    peak_current_a: 25.0
+    continuous_current_a: 12.0
+    bms_protection_assumption: external low-voltage cutoff required
+    placement_m:
+      x: 0.020
+      y: 0.000
+      z: 0.205
+
+  lipo_3s_1500mah:
+    mass_kg: 0.135
+    dimensions_m:
+      x: 0.073
+      y: 0.035
+      z: 0.027
+    nominal_voltage_v: 11.1
+    usable_capacity_wh: 13.0
+    peak_current_a: 45.0
+    continuous_current_a: 22.0
+    bms_protection_assumption: external low-voltage cutoff required
+    placement_m:
+      x: 0.010
+      y: 0.000
+      z: 0.205
+
+  lipo_4s_2200mah:
+    mass_kg: 0.240
+    dimensions_m:
+      x: 0.105
+      y: 0.035
+      z: 0.033
+    nominal_voltage_v: 14.8
+    usable_capacity_wh: 29.0
+    peak_current_a: 70.0
+    continuous_current_a: 35.0
+    bms_protection_assumption: external low-voltage cutoff required
+    placement_m:
+      x: -0.005
+      y: 0.000
+      z: 0.200
+
+electronics:
+  controller:
+    mass_kg: 0.045
+    dimensions_m:
+      x: 0.055
+      y: 0.040
+      z: 0.018
+    placement_m:
+      x: 0.085
+      y: 0.000
+      z: 0.245
+  power_distribution:
+    mass_kg: 0.025
+    dimensions_m:
+      x: 0.045
+      y: 0.030
+      z: 0.014
+    placement_m:
+      x: -0.030
+      y: 0.000
+      z: 0.235
+  wire_harness:
+    mass_kg: 0.060
+    placement_m:
+      x: 0.020
+      y: 0.000
+      z: 0.215
+  connectors:
+    mass_kg: 0.025
+    placement_m:
+      x: 0.000
+      y: 0.000
+      z: 0.225

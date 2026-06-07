@@ -1,0 +1,66 @@
+# Stage 1 physical material placeholders.
+# Values are conservative early-design estimates, not calibrated coupon data.
+
+default_structural_material: pla_plus
+default_elastomer_material: tpu_95a
+
+materials:
+  pla_plus:
+    class: fdm_printed_polymer
+    density_kg_m3: 1240.0
+    youngs_modulus_pa: 3200000000.0
+    poisson_ratio: 0.36
+    yield_strength_pa: 45000000.0
+    ultimate_strength_pa: 60000000.0
+    fatigue_assumption: low confidence; avoid cyclic tensile layer loading
+    layer_adhesion_strength_pa: 18000000.0
+    anisotropy_factor: 0.55
+    recommended_print_orientation: keep primary bending and tension loads in XY when possible
+
+  petg:
+    class: fdm_printed_polymer
+    density_kg_m3: 1270.0
+    youngs_modulus_pa: 2100000000.0
+    poisson_ratio: 0.38
+    yield_strength_pa: 38000000.0
+    ultimate_strength_pa: 50000000.0
+    fatigue_assumption: better ductility than PLA; still derate layer tension heavily
+    layer_adhesion_strength_pa: 16000000.0
+    anisotropy_factor: 0.50
+    recommended_print_orientation: avoid Z-layer peel at brackets and bearing seats
+
+  asa_abs:
+    class: fdm_printed_polymer
+    density_kg_m3: 1050.0
+    youngs_modulus_pa: 1900000000.0
+    poisson_ratio: 0.35
+    yield_strength_pa: 30000000.0
+    ultimate_strength_pa: 42000000.0
+    fatigue_assumption: ductile thermal-resistant option; needs print quality calibration
+    layer_adhesion_strength_pa: 14000000.0
+    anisotropy_factor: 0.48
+    recommended_print_orientation: use enclosed printing; avoid unsupported thin vertical tabs
+
+  paht_cf:
+    class: fdm_printed_fiber_filled_polyamide
+    density_kg_m3: 1180.0
+    youngs_modulus_pa: 6500000000.0
+    poisson_ratio: 0.32
+    yield_strength_pa: 70000000.0
+    ultimate_strength_pa: 95000000.0
+    fatigue_assumption: preferred high-stiffness candidate after drying and coupon testing
+    layer_adhesion_strength_pa: 28000000.0
+    anisotropy_factor: 0.62
+    recommended_print_orientation: align fiber-rich XY raster with link length and bracket load path
+
+  tpu_95a:
+    class: fdm_printed_elastomer
+    density_kg_m3: 1200.0
+    youngs_modulus_pa: 40000000.0
+    poisson_ratio: 0.49
+    yield_strength_pa: 7000000.0
+    ultimate_strength_pa: 25000000.0
+    fatigue_assumption: useful for pads and compliant feet, not structural links
+    layer_adhesion_strength_pa: 6000000.0
+    anisotropy_factor: 0.45
+    recommended_print_orientation: print pads flat; avoid relying on thin Z-direction features

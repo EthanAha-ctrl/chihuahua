@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Interactive pygame linkage viewer for yaw/pitch-waist endpoint geometry.
+"""Interactive pygame Stage 1 mass and torque viewer.
 
-No solid body rendering. No physics. No contact. No controller.
+No solid body rendering. No FEM. No controller.
 
-The drawing is only a constrained linkage diagram:
+The drawing is still a constrained linkage diagram, with a rough Stage 1
+electromechanical overlay:
 
 - rear waist yaw joint
 - front waist pitch joint
 - short head claw link
 - front/rear hip cross links
 - hip -> knee -> toe joint -> toe endpoint links
+- live mass / COM / point-mass inertia estimate
+- live free-space inertial torque estimate
+- material property drag bars
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+from matplotlib import colormaps
 
 try:
     import pygame
@@ -30,6 +35,7 @@ except ModuleNotFoundError as exc:
     raise SystemExit("pygame is required. Install dependencies with: uv sync") from exc
 
 from endpoint_geometry import LEG_ORDER, RobotGeometry, waist_joint_points
+import mass_model as stage1
 from dog_description import (
     DEFAULT_DESCRIPTION_PATH,
     DogDescription,
@@ -41,6 +47,9 @@ from dog_description import (
 
 Color = tuple[int, int, int]
 Point2 = tuple[int, int]
+SEISMIC_CMAP = colormaps["seismic"]
+LINK_GRAY: Color = (148, 156, 166)
+JOINT_GRAY: Color = (112, 121, 132)
 DOF_KEYS = (
     "waist:yaw",
     "waist:pitch",
@@ -73,7 +82,9 @@ class ViewerState:
     dof_index: int = 0
     babble_scale: float = 1.0
     show_help: bool = True
-    show_tuning: bool = True
+    show_tuning: bool = False
+    show_materials: bool = True
+    motion_paused: bool = False
     sim_time: float = 0.0
     camera: Camera = field(default_factory=Camera)
 
@@ -110,6 +121,28 @@ class TuningOverlay:
     dirty: bool = False
 
 
+@dataclass
+class MaterialControl:
+    property_key: str
+    label: str
+    unit: str
+    scale: float
+    value_si: float
+    original_si: float
+    lower_si: float
+    upper_si: float
+    rect: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
+
+
+@dataclass
+class MaterialOverlay:
+    material_name: str
+    controls: list[MaterialControl]
+    active_index: int | None = None
+    panel_rect: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
+    status: str = ""
+
+
 @dataclass(frozen=True)
 class BodyPose:
     yaw_joint: np.ndarray
@@ -118,6 +151,15 @@ class BodyPose:
     rear_mid: np.ndarray
     hips: dict[str, np.ndarray]
     bases: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]
+
+
+@dataclass(frozen=True)
+class Stage1Telemetry:
+    catalog: stage1.PhysicalCatalog
+    model: stage1.MassModel
+    torque_rows: list[stage1.TorqueRow]
+    worst_margin: stage1.TorqueRow
+    largest_torque: stage1.TorqueRow
 
 
 def v3(x: float, y: float, z: float = 0.0) -> np.ndarray:
@@ -249,12 +291,13 @@ def add_joint(
     point3: np.ndarray,
     radius: int,
     color: Color,
+    scale_radius: bool = True,
 ) -> None:
     out = project(point3, camera, screen_size)
     if out is None:
         return
     point2, depth = out
-    commands.append(DrawCommand(depth, "circle", (point2,), color, radius))
+    commands.append(DrawCommand(depth, "circle", (point2,), color, radius * 2 if scale_radius else radius))
 
 
 def draw_grid(commands: list[DrawCommand], camera: Camera, screen_size: tuple[int, int]) -> None:
@@ -410,6 +453,7 @@ def add_head_claw(
     commands: list[DrawCommand],
     viewer: ViewerState,
     description: DogDescription,
+    telemetry: Stage1Telemetry,
     front_anchor: np.ndarray,
     front_forward: np.ndarray,
     front_left: np.ndarray,
@@ -424,15 +468,15 @@ def add_head_claw(
     upper_tip = chain["upper_tip"]
     lower_tip = chain["lower_tip"]
 
-    color = (198, 224, 255)
-    jaw_color = (255, 215, 118)
+    color = LINK_GRAY
+    jaw_color = LINK_GRAY
     add_line(commands, viewer.camera, screen_size, root, hinge, color, 4)
     add_line(commands, viewer.camera, screen_size, upper_hinge, lower_hinge, color, 3)
     add_line(commands, viewer.camera, screen_size, upper_hinge, upper_tip, jaw_color, 4)
     add_line(commands, viewer.camera, screen_size, lower_hinge, lower_tip, jaw_color, 4)
-    add_joint(commands, viewer.camera, screen_size, root, 4, color)
-    add_joint(commands, viewer.camera, screen_size, upper_hinge, 4, jaw_color)
-    add_joint(commands, viewer.camera, screen_size, lower_hinge, 4, jaw_color)
+    add_joint(commands, viewer.camera, screen_size, root, 4, torque_joint_color(telemetry, ("neck_yaw", "neck_pitch")))
+    add_joint(commands, viewer.camera, screen_size, upper_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
+    add_joint(commands, viewer.camera, screen_size, lower_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
 
 
 def add_linkage_scene(
@@ -440,19 +484,20 @@ def add_linkage_scene(
     g: RobotGeometry,
     viewer: ViewerState,
     description: DogDescription,
+    telemetry: Stage1Telemetry,
     screen_size: tuple[int, int],
 ) -> dict[str, float]:
     draw_grid(commands, viewer.camera, screen_size)
     pose = make_body_pose(g, viewer, description)
     hips = pose.hips
 
-    add_line(commands, viewer.camera, screen_size, pose.yaw_joint, pose.pitch_joint, (238, 241, 245), 5)
-    add_line(commands, viewer.camera, screen_size, pose.pitch_joint, pose.front_mid, (116, 170, 231), 4)
-    add_line(commands, viewer.camera, screen_size, pose.yaw_joint, pose.rear_mid, (236, 176, 103), 4)
-    add_line(commands, viewer.camera, screen_size, hips["front_left"], hips["front_right"], (116, 170, 231), 4)
-    add_line(commands, viewer.camera, screen_size, hips["rear_left"], hips["rear_right"], (236, 176, 103), 4)
-    add_joint(commands, viewer.camera, screen_size, pose.yaw_joint, 7, (236, 176, 103))
-    add_joint(commands, viewer.camera, screen_size, pose.pitch_joint, 7, (116, 170, 231))
+    add_line(commands, viewer.camera, screen_size, pose.yaw_joint, pose.pitch_joint, LINK_GRAY, 5)
+    add_line(commands, viewer.camera, screen_size, pose.pitch_joint, pose.front_mid, LINK_GRAY, 4)
+    add_line(commands, viewer.camera, screen_size, pose.yaw_joint, pose.rear_mid, LINK_GRAY, 4)
+    add_line(commands, viewer.camera, screen_size, hips["front_left"], hips["front_right"], LINK_GRAY, 4)
+    add_line(commands, viewer.camera, screen_size, hips["rear_left"], hips["rear_right"], LINK_GRAY, 4)
+    add_joint(commands, viewer.camera, screen_size, pose.yaw_joint, 7, torque_joint_color(telemetry, ("waist_yaw",)))
+    add_joint(commands, viewer.camera, screen_size, pose.pitch_joint, 7, torque_joint_color(telemetry, ("waist_pitch",)))
     front_forward, front_outward, front_down = pose.bases["front_left"]
     front_left = front_outward
     front_up = -front_down
@@ -460,6 +505,7 @@ def add_linkage_scene(
         commands,
         viewer,
         description,
+        telemetry,
         pose.front_mid,
         front_forward,
         front_left,
@@ -470,17 +516,36 @@ def add_linkage_scene(
     toe_endpoints: list[np.ndarray] = []
     for name in LEG_ORDER:
         chain = leg_chain(viewer, description, name, hips[name], pose.bases[name])
-        leg_color = (202, 218, 232) if name.startswith("front") else (226, 209, 187)
-        toe_color = (245, 209, 83)
 
-        add_line(commands, viewer.camera, screen_size, chain["hip"], chain["knee"], leg_color, 4)
-        add_line(commands, viewer.camera, screen_size, chain["knee"], chain["toe_joint"], leg_color, 4)
-        add_line(commands, viewer.camera, screen_size, chain["toe_joint"], chain["toe_endpoint"], toe_color, 4)
+        add_line(commands, viewer.camera, screen_size, chain["hip"], chain["knee"], LINK_GRAY, 4)
+        add_line(commands, viewer.camera, screen_size, chain["knee"], chain["toe_joint"], LINK_GRAY, 4)
+        add_line(commands, viewer.camera, screen_size, chain["toe_joint"], chain["toe_endpoint"], LINK_GRAY, 4)
 
-        add_joint(commands, viewer.camera, screen_size, chain["hip"], 5, (236, 240, 244))
-        add_joint(commands, viewer.camera, screen_size, chain["knee"], 5, (168, 184, 198))
-        add_joint(commands, viewer.camera, screen_size, chain["toe_joint"], 5, (245, 209, 83))
-        add_joint(commands, viewer.camera, screen_size, chain["toe_endpoint"], 4, (255, 232, 128))
+        add_joint(
+            commands,
+            viewer.camera,
+            screen_size,
+            chain["hip"],
+            5,
+            torque_joint_color(telemetry, (f"{name}_hip_ab", f"{name}_hip_pitch")),
+        )
+        add_joint(
+            commands,
+            viewer.camera,
+            screen_size,
+            chain["knee"],
+            5,
+            torque_joint_color(telemetry, (f"{name}_knee_bend",)),
+        )
+        add_joint(
+            commands,
+            viewer.camera,
+            screen_size,
+            chain["toe_joint"],
+            5,
+            torque_joint_color(telemetry, (f"{name}_toe_bend",)),
+        )
+        add_joint(commands, viewer.camera, screen_size, chain["toe_endpoint"], 4, JOINT_GRAY, scale_radius=False)
         toe_endpoints.append(chain["toe_endpoint"])
 
     reaches = [float(np.linalg.norm(p[:2] - hips[name][:2])) for p, name in zip(toe_endpoints, LEG_ORDER)]
@@ -496,11 +561,108 @@ def make_scene_commands(
     g: RobotGeometry,
     viewer: ViewerState,
     description: DogDescription,
+    telemetry: Stage1Telemetry,
     screen_size: tuple[int, int],
 ) -> tuple[list[DrawCommand], dict[str, float]]:
     commands: list[DrawCommand] = []
-    metrics = add_linkage_scene(commands, g, viewer, description, screen_size)
+    metrics = add_linkage_scene(commands, g, viewer, description, telemetry, screen_size)
     return commands, metrics
+
+
+def make_stage1_telemetry(
+    description: DogDescription,
+    viewer: ViewerState,
+    catalog: stage1.PhysicalCatalog,
+) -> Stage1Telemetry:
+    model = stage1.build_mass_model(
+        "viewer_live",
+        description,
+        catalog,
+        stage1.Stage1Assumptions(),
+        viewer.waist_deg,
+        viewer.waist_pitch_deg,
+    )
+    rows = stage1.estimate_torques(model, catalog, stage1.Stage1Assumptions())
+    finite_rows = [row for row in rows if row.continuous_margin is not None]
+    worst_margin = min(finite_rows, key=lambda row: row.continuous_margin or math.inf)
+    largest_torque = max(rows, key=lambda row: row.required_torque_nm)
+    return Stage1Telemetry(
+        catalog=catalog,
+        model=model,
+        torque_rows=rows,
+        worst_margin=worst_margin,
+        largest_torque=largest_torque,
+    )
+
+
+def joint_position_for_row(model: stage1.MassModel, row: stage1.TorqueRow) -> np.ndarray:
+    joint = row.joint
+    if joint == "waist_yaw":
+        return model.pose.yaw_joint
+    if joint == "waist_pitch":
+        return model.pose.pitch_joint
+    if joint in {"neck_yaw", "neck_pitch"}:
+        return model.head.root
+    if joint == "head_claw":
+        return model.head.hinge
+
+    for leg_name in LEG_ORDER:
+        prefix = f"{leg_name}_"
+        if not joint.startswith(prefix):
+            continue
+        joint_type = joint.removeprefix(prefix)
+        chain = model.legs[leg_name]
+        if joint_type in {"hip_ab", "hip_pitch"}:
+            return chain.hip
+        if joint_type == "knee_bend":
+            return chain.knee
+        if joint_type == "toe_bend":
+            return chain.toe_joint
+    return model.com_m
+
+
+def add_stage1_markers(
+    commands: list[DrawCommand],
+    viewer: ViewerState,
+    telemetry: Stage1Telemetry,
+    screen_size: tuple[int, int],
+) -> None:
+    com = telemetry.model.com_m
+    com_shadow = v3(float(com[0]), float(com[1]), 0.0)
+    add_line(commands, viewer.camera, screen_size, com_shadow, com, (126, 235, 210), 3)
+    add_joint(commands, viewer.camera, screen_size, com, 9, (126, 235, 210), scale_radius=False)
+
+
+def seismic_torque_color(required_torque_nm: float, global_max_torque_nm: float) -> Color:
+    if global_max_torque_nm <= 1e-9:
+        t = 0.0
+    else:
+        t = max(0.0, min(1.0, required_torque_nm / global_max_torque_nm))
+    r, g, b, _a = SEISMIC_CMAP(t)
+    return int(round(r * 255)), int(round(g * 255)), int(round(b * 255))
+
+
+def row_by_joint_name(telemetry: Stage1Telemetry) -> dict[str, stage1.TorqueRow]:
+    return {row.joint: row for row in telemetry.torque_rows}
+
+
+def joint_group_rows(
+    rows_by_joint: dict[str, stage1.TorqueRow],
+    joint_names: tuple[str, ...],
+) -> list[stage1.TorqueRow]:
+    return [rows_by_joint[name] for name in joint_names if name in rows_by_joint]
+
+
+def strongest_required_row(rows: list[stage1.TorqueRow]) -> stage1.TorqueRow:
+    return max(rows, key=lambda row: row.required_torque_nm)
+
+
+def torque_joint_color(telemetry: Stage1Telemetry, joint_names: tuple[str, ...]) -> Color:
+    rows = joint_group_rows(row_by_joint_name(telemetry), joint_names)
+    if not rows:
+        return JOINT_GRAY
+    color_row = strongest_required_row(rows)
+    return seismic_torque_color(color_row.required_torque_nm, telemetry.largest_torque.required_torque_nm)
 
 
 def render_commands(screen: pygame.Surface, commands: list[DrawCommand]) -> None:
@@ -517,6 +679,191 @@ def slider_bounds(original_value: float, zero_span: float = 1.0) -> tuple[float,
     a = original_value * 0.5
     b = original_value * 1.5
     return min(a, b), max(a, b)
+
+
+def build_material_overlay(catalog: stage1.PhysicalCatalog) -> MaterialOverlay:
+    material = catalog.materials[catalog.structural_material]
+    props = material.properties
+    specs = (
+        ("density_kg_m3", "density", "kg/m3", 1.0, 0.50, 1.50),
+        ("youngs_modulus_pa", "Young", "GPa", 1e-9, 0.35, 1.75),
+        ("yield_strength_pa", "yield", "MPa", 1e-6, 0.35, 1.75),
+        ("layer_adhesion_strength_pa", "layer", "MPa", 1e-6, 0.25, 1.75),
+        ("anisotropy_factor", "anisotropy", "", 1.0, 0.20, 1.00),
+    )
+    controls: list[MaterialControl] = []
+    for key, label, unit, scale, low_factor, high_factor in specs:
+        value = float(props[key])
+        lower = value * low_factor
+        upper = value * high_factor
+        if key == "anisotropy_factor":
+            lower = low_factor
+            upper = high_factor
+        controls.append(
+            MaterialControl(
+                property_key=key,
+                label=label,
+                unit=unit,
+                scale=scale,
+                value_si=value,
+                original_si=value,
+                lower_si=lower,
+                upper_si=upper,
+            )
+        )
+    return MaterialOverlay(material_name=material.name, controls=controls)
+
+
+def live_catalog_with_material_overlay(
+    base_catalog: stage1.PhysicalCatalog,
+    overlay: MaterialOverlay,
+) -> stage1.PhysicalCatalog:
+    materials = dict(base_catalog.materials)
+    base_material = base_catalog.materials[overlay.material_name]
+    properties = dict(base_material.properties)
+    for control in overlay.controls:
+        properties[control.property_key] = control.value_si
+    materials[overlay.material_name] = stage1.Material(
+        name=base_material.name,
+        density_kg_m3=float(properties["density_kg_m3"]),
+        properties=properties,
+    )
+    return stage1.PhysicalCatalog(
+        materials=materials,
+        structural_material=base_catalog.structural_material,
+        elastomer_material=base_catalog.elastomer_material,
+        actuators=base_catalog.actuators,
+        actuator_assignments=base_catalog.actuator_assignments,
+        battery=base_catalog.battery,
+        electronics=base_catalog.electronics,
+    )
+
+
+def material_slider_value_from_x(control: MaterialControl, mouse_x: int) -> float:
+    if control.rect.width <= 0 or abs(control.upper_si - control.lower_si) < 1e-12:
+        return control.lower_si
+    t = (mouse_x - control.rect.left) / control.rect.width
+    t = max(0.0, min(1.0, t))
+    return control.lower_si + t * (control.upper_si - control.lower_si)
+
+
+def material_slider_x_from_value(control: MaterialControl) -> int:
+    if abs(control.upper_si - control.lower_si) < 1e-12:
+        return control.rect.left
+    t = (control.value_si - control.lower_si) / (control.upper_si - control.lower_si)
+    t = max(0.0, min(1.0, t))
+    return int(control.rect.left + t * control.rect.width)
+
+
+def layout_material_overlay(
+    overlay: MaterialOverlay,
+    screen_size: tuple[int, int],
+    tuning_panel: pygame.Rect | None,
+) -> None:
+    width, height = screen_size
+    panel_width = min(760, max(520, width - 32))
+    panel_x = max(16, width - panel_width - 20)
+    panel_y = 20
+    if tuning_panel is not None:
+        panel_y = min(max(20, tuning_panel.bottom + 18), max(20, height - 350))
+
+    y = panel_y + 86
+    slider_left = panel_x + min(420, panel_width - 220)
+    for control in overlay.controls:
+        control.rect = pygame.Rect(slider_left, y + 12, panel_x + panel_width - slider_left - 42, 12)
+        y += 46
+
+    panel_height = max(260, min(height - panel_y - 20, y - panel_y + 58))
+    overlay.panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+
+
+def handle_material_overlay_event(event: pygame.event.Event, viewer: ViewerState, overlay: MaterialOverlay) -> bool:
+    if not viewer.show_materials:
+        return False
+
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if not overlay.panel_rect.collidepoint(event.pos):
+            return False
+        for i, control in enumerate(overlay.controls):
+            if control.rect.inflate(0, 18).collidepoint(event.pos):
+                overlay.active_index = i
+                control.value_si = material_slider_value_from_x(control, event.pos[0])
+                overlay.status = f"{control.label} changed"
+                return True
+        return True
+
+    if event.type == pygame.MOUSEMOTION and overlay.active_index is not None:
+        control = overlay.controls[overlay.active_index]
+        control.value_si = material_slider_value_from_x(control, event.pos[0])
+        overlay.status = f"{control.label} changed"
+        return True
+
+    if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and overlay.active_index is not None:
+        overlay.active_index = None
+        return True
+
+    return False
+
+
+def draw_material_overlay(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    small_font: pygame.font.Font,
+    viewer: ViewerState,
+    overlay: MaterialOverlay,
+    telemetry: Stage1Telemetry,
+) -> None:
+    if not viewer.show_materials:
+        return
+
+    panel = overlay.panel_rect
+    pygame.draw.rect(screen, (18, 22, 27), panel, border_radius=8)
+    pygame.draw.rect(screen, (78, 89, 102), panel, width=1, border_radius=8)
+
+    title = font.render(f"stage 1 material | {overlay.material_name}", True, (238, 241, 245))
+    screen.blit(title, (panel.x + 20, panel.y + 20))
+    mass_line = small_font.render(
+        f"mass {telemetry.model.total_mass_kg:.3f} kg | worst margin {telemetry.worst_margin.continuous_margin:.2f}x",
+        True,
+        (216, 224, 232),
+    )
+    screen.blit(mass_line, (panel.x + 20, panel.y + 54))
+
+    for control in overlay.controls:
+        value = control.value_si * control.scale
+        unit = f" {control.unit}" if control.unit else ""
+        label = small_font.render(f"{control.label:<10} {value:8.3f}{unit}", True, (178, 188, 200))
+        screen.blit(label, (panel.x + 38, control.rect.y - 8))
+
+        pygame.draw.rect(screen, (50, 58, 68), control.rect, border_radius=4)
+        pygame.draw.rect(
+            screen,
+            (70, 119, 146),
+            pygame.Rect(control.rect.left, control.rect.top, material_slider_x_from_value(control) - control.rect.left, control.rect.height),
+            border_radius=4,
+        )
+        knob_x = material_slider_x_from_value(control)
+        active = overlay.active_index is not None and overlay.controls[overlay.active_index] is control
+        knob_color = (255, 217, 120) if active else (152, 218, 223)
+        pygame.draw.circle(screen, knob_color, (knob_x, control.rect.centery), 11)
+
+    bar_rect = pygame.Rect(panel.x + 20, panel.bottom - 76, 260, 12)
+    max_torque = telemetry.largest_torque.required_torque_nm
+    for i in range(bar_rect.width):
+        value = 0.0 if bar_rect.width <= 1 else max_torque * i / (bar_rect.width - 1)
+        pygame.draw.line(
+            screen,
+            seismic_torque_color(value, max_torque),
+            (bar_rect.x + i, bar_rect.y),
+            (bar_rect.x + i, bar_rect.bottom),
+        )
+    pygame.draw.rect(screen, (96, 106, 118), bar_rect, width=1, border_radius=3)
+    scale_label = small_font.render(f"joint torque 0..{max_torque:.3f} Nm", True, (158, 169, 181))
+    screen.blit(scale_label, (bar_rect.right + 18, bar_rect.y - 6))
+
+    status = overlay.status or "drag material bars"
+    status_surface = small_font.render(status, True, (139, 151, 164))
+    screen.blit(status_surface, (panel.x + 20, panel.bottom - 38))
 
 
 def add_scalar_tuning_control(
@@ -833,21 +1180,30 @@ def draw_text_panel(
     small_font: pygame.font.Font,
     viewer: ViewerState,
     metrics: dict[str, float],
+    telemetry: Stage1Telemetry,
     fps: float,
 ) -> None:
     panel_width = min(screen.get_width() - 32, 1080)
-    panel = pygame.Rect(16, 16, panel_width, 390 if viewer.show_help else 176)
+    panel = pygame.Rect(16, 16, panel_width, 484 if viewer.show_help else 278)
     pygame.draw.rect(screen, (22, 27, 33), panel, border_radius=8)
     pygame.draw.rect(screen, (70, 79, 91), panel, width=1, border_radius=8)
 
+    com = telemetry.model.com_m
+    margin = telemetry.worst_margin.continuous_margin
     lines = [
         (
-            f"linkage only | waist yaw {viewer.waist_deg:+.1f} deg "
-            f"| pitch {viewer.waist_pitch_deg:+.1f} deg | fps {fps:4.1f}"
+            f"stage 1 mass/torque | waist yaw {viewer.waist_deg:+.1f} deg "
+            f"| pitch {viewer.waist_pitch_deg:+.1f} deg | {'paused' if viewer.motion_paused else 'live'} | fps {fps:4.1f}"
         ),
-        f"joint babble {viewer.babble_scale:.2f} | toe joint + short head claw",
+        f"mass {telemetry.model.total_mass_kg:.3f} kg | COM x {com[0]:+.3f} y {com[1]:+.3f} z {com[2]:+.3f} m",
+        (
+            f"worst margin {margin:.2f}x | {telemetry.worst_margin.joint} "
+            f"{telemetry.worst_margin.required_torque_nm:.3f} Nm"
+        ),
+        f"largest torque {telemetry.largest_torque.joint} {telemetry.largest_torque.required_torque_nm:.3f} Nm",
+        f"joint fill seismic scale 0..{telemetry.largest_torque.required_torque_nm:.3f} Nm global",
         f"max XY toe reach {metrics['max_reach_xy']:.3f} m | toe z {metrics['min_toe_z']:.3f}..{metrics['max_toe_z']:.3f} m",
-        "no solid bodies, no physics/contact/control",
+        "rough placeholders | no CAD mass, no FEM, no controller",
     ]
     if viewer.dof_solo:
         lines.append(f"DOF solo {viewer.dof_index % len(DOF_KEYS) + 1:02d}/{len(DOF_KEYS)} | {active_dof_key(viewer)}")
@@ -862,10 +1218,11 @@ def draw_text_panel(
         y += 12
         help_lines = [
             "left/right or A/D: waist yaw    up/down or W/S: waist pitch",
-            "space: waist joint babble",
+            "space: freeze motion",
             "M: 21-DOF solo    N: next solo DOF",
             "B: joint babble    ,/.: babble amplitude",
-            "left-drag mouse: orbit camera    wheel: zoom    T: tuning overlay",
+            "left-drag mouse: orbit camera    wheel: zoom",
+            "Y: material/torque overlay    T: geometry tuning overlay",
             "P: screenshot    ?: help    Esc: quit",
         ]
         for line in help_lines:
@@ -879,6 +1236,8 @@ def clamp_joint_degrees(value: float, spec: JointRange) -> float:
 
 
 def update_autoplay(viewer: ViewerState, description: DogDescription) -> None:
+    if viewer.motion_paused:
+        return
     if viewer.waist_babble or viewer.dof_solo:
         viewer.waist_deg = math.degrees(ranged_joint_angle(viewer, "waist:yaw", description.joint_ranges["waist_yaw"]))
         viewer.waist_pitch_deg = math.degrees(
@@ -904,7 +1263,7 @@ def handle_key(event: pygame.event.Event, viewer: ViewerState, description: DogD
         viewer.waist_babble = False
         viewer.waist_pitch_deg = clamp_joint_degrees(viewer.waist_pitch_deg - 2.0, pitch_spec)
     elif event.key == pygame.K_SPACE:
-        viewer.waist_babble = not viewer.waist_babble
+        viewer.motion_paused = not viewer.motion_paused
     elif event.key == pygame.K_b:
         viewer.joint_babble = not viewer.joint_babble
     elif event.key == pygame.K_m:
@@ -916,6 +1275,8 @@ def handle_key(event: pygame.event.Event, viewer: ViewerState, description: DogD
         viewer.sim_time = 0.0
     elif event.key == pygame.K_t:
         viewer.show_tuning = not viewer.show_tuning
+    elif event.key == pygame.K_y:
+        viewer.show_materials = not viewer.show_materials
     elif event.key == pygame.K_COMMA:
         viewer.babble_scale = max(0.0, viewer.babble_scale - 0.10)
     elif event.key == pygame.K_PERIOD:
@@ -936,22 +1297,25 @@ def run_viewer(args: argparse.Namespace) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
     pygame.init()
-    pygame.display.set_caption("Yaw/pitch-waist constrained linkage viewer")
+    pygame.display.set_caption("Stage 1 mass/torque linkage viewer")
     screen = pygame.display.set_mode((args.width, args.height))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Menlo,Consolas,monospace", 24)
     small_font = pygame.font.SysFont("Menlo,Consolas,monospace", 20)
 
     description = load_dog_description(args.config)
+    base_catalog = stage1.load_catalog(args.materials, args.actuators, args.batteries)
     tuning_overlay = build_tuning_overlay(description)
+    material_overlay = build_material_overlay(base_catalog)
     viewer = ViewerState(
         waist_deg=args.waist,
         waist_pitch_deg=args.waist_pitch,
-        waist_babble=not args.paused,
+        waist_babble=True,
         joint_babble=not args.no_babble,
         dof_solo=args.dof_solo,
         dof_index=args.dof_index % len(DOF_KEYS),
         babble_scale=args.babble_scale,
+        motion_paused=args.paused,
     )
     dragging = False
     last_mouse = (0, 0)
@@ -961,18 +1325,26 @@ def run_viewer(args: argparse.Namespace) -> None:
 
     while running:
         dt = clock.tick(60) / 1000.0
-        viewer.sim_time += dt
+        if not viewer.motion_paused:
+            viewer.sim_time += dt
         layout_tuning_overlay(tuning_overlay, screen.get_size())
+        layout_material_overlay(
+            material_overlay,
+            screen.get_size(),
+            tuning_overlay.panel_rect if viewer.show_tuning else None,
+        )
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
-                    screenshot_path = args.out_dir / "pygame_viewer_screenshot.png"
+                    screenshot_path = args.out_dir / "pygame_mass_viewer_screenshot.png"
                 else:
                     running = handle_key(event, viewer, description)
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                if handle_material_overlay_event(event, viewer, material_overlay):
+                    continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
                 if event.button == 1:
@@ -983,10 +1355,14 @@ def run_viewer(args: argparse.Namespace) -> None:
                 elif event.button == 5:
                     viewer.camera.distance = min(3.00, viewer.camera.distance * 1.08)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if handle_material_overlay_event(event, viewer, material_overlay):
+                    continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
                 dragging = False
             elif event.type == pygame.MOUSEMOTION and dragging:
+                if handle_material_overlay_event(event, viewer, material_overlay):
+                    continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
                 dx = event.pos[0] - last_mouse[0]
@@ -995,6 +1371,7 @@ def run_viewer(args: argparse.Namespace) -> None:
                 viewer.camera.pitch = wrap_angle(viewer.camera.pitch - dy * 0.006)
                 last_mouse = event.pos
             elif event.type == pygame.MOUSEMOTION:
+                handle_material_overlay_event(event, viewer, material_overlay)
                 handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config)
 
         update_autoplay(viewer, description)
@@ -1005,10 +1382,14 @@ def run_viewer(args: argparse.Namespace) -> None:
 
         screen.fill((12, 15, 19))
         geometry = RobotGeometry(**description.geometry.robot_geometry_kwargs())
-        commands, metrics = make_scene_commands(geometry, viewer, description, screen.get_size())
+        live_catalog = live_catalog_with_material_overlay(base_catalog, material_overlay)
+        telemetry = make_stage1_telemetry(description, viewer, live_catalog)
+        commands, metrics = make_scene_commands(geometry, viewer, description, telemetry, screen.get_size())
+        add_stage1_markers(commands, viewer, telemetry, screen.get_size())
         render_commands(screen, commands)
-        draw_text_panel(screen, font, small_font, viewer, metrics, clock.get_fps())
+        draw_text_panel(screen, font, small_font, viewer, metrics, telemetry, clock.get_fps())
         draw_tuning_overlay(screen, font, small_font, viewer, tuning_overlay, description)
+        draw_material_overlay(screen, font, small_font, viewer, material_overlay, telemetry)
         pygame.display.flip()
 
         if screenshot_path is not None:
@@ -1028,7 +1409,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=1440)
     parser.add_argument("--waist", type=float, default=24.0)
     parser.add_argument("--waist-pitch", type=float, default=0.0)
-    parser.add_argument("--paused", action="store_true", help="start with waist joint babble paused")
+    parser.add_argument("--paused", action="store_true", help="start with motion frozen")
     parser.add_argument("--no-babble", action="store_true", help="freeze constrained joint babble")
     parser.add_argument("--dof-solo", action="store_true", help="animate one of the 21 DOFs at a time")
     parser.add_argument("--dof-index", type=int, default=0, help="zero-based DOF index for --dof-solo")
@@ -1038,6 +1419,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--screenshot", type=Path, default=None, help="save one screenshot and keep running unless headless")
     parser.add_argument("--out-dir", type=Path, default=Path("endpoint_outputs"))
     parser.add_argument("--config", type=Path, default=DEFAULT_DESCRIPTION_PATH, help="dog description YAML")
+    parser.add_argument("--materials", type=Path, default=stage1.DEFAULT_MATERIALS_PATH, help="material catalog YAML")
+    parser.add_argument("--actuators", type=Path, default=stage1.DEFAULT_ACTUATORS_PATH, help="actuator catalog YAML")
+    parser.add_argument("--batteries", type=Path, default=stage1.DEFAULT_BATTERIES_PATH, help="battery/electronics catalog YAML")
     return parser.parse_args()
 
 

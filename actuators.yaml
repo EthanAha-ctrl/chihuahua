@@ -1,0 +1,89 @@
+# Stage 1 actuator catalog placeholders.
+# Torque and thermal numbers must be replaced with real datasheets before CAD lock-in.
+
+default_actuator_set:
+  waist_yaw: compact_servo_2nm
+  waist_pitch: compact_servo_2nm
+  hip_ab: compact_servo_2nm
+  hip_pitch: compact_servo_2nm
+  knee_bend: compact_servo_2nm
+  toe_bend: micro_servo_0_4nm
+  neck_yaw: micro_servo_0_4nm
+  neck_pitch: micro_servo_0_4nm
+  head_claw: micro_servo_0_4nm
+
+actuators:
+  micro_servo_0_4nm:
+    mass_kg: 0.020
+    dimensions_m:
+      x: 0.023
+      y: 0.012
+      z: 0.025
+    mounting_pattern: two-lug micro servo, placeholder
+    max_torque_nm: 0.45
+    continuous_torque_nm: 0.16
+    stall_torque_nm: 0.55
+    max_speed_rad_s: 7.0
+    gear_ratio: 180.0
+    backlash_deg: 2.0
+    thermal_limit_c: 65.0
+    current_draw_a:
+      idle: 0.05
+      continuous: 0.35
+      stall: 1.2
+    voltage_v:
+      min: 6.0
+      nominal: 7.4
+      max: 8.4
+    driver_mass_kg: 0.003
+    notes: distal, neck, and head-claw placeholder only
+
+  compact_servo_2nm:
+    mass_kg: 0.095
+    dimensions_m:
+      x: 0.040
+      y: 0.040
+      z: 0.030
+    mounting_pattern: square face mount with radial output horn, placeholder
+    max_torque_nm: 2.4
+    continuous_torque_nm: 0.95
+    stall_torque_nm: 3.0
+    max_speed_rad_s: 5.5
+    gear_ratio: 280.0
+    backlash_deg: 1.0
+    thermal_limit_c: 70.0
+    current_draw_a:
+      idle: 0.08
+      continuous: 1.2
+      stall: 4.5
+    voltage_v:
+      min: 7.4
+      nominal: 11.1
+      max: 12.6
+    driver_mass_kg: 0.008
+    notes: first-pass hip, knee, and waist actuator placeholder
+
+  compact_actuator_5nm:
+    mass_kg: 0.180
+    dimensions_m:
+      x: 0.052
+      y: 0.052
+      z: 0.038
+    mounting_pattern: coaxial output bearing mount, placeholder
+    max_torque_nm: 5.5
+    continuous_torque_nm: 2.2
+    stall_torque_nm: 7.0
+    max_speed_rad_s: 4.5
+    gear_ratio: 360.0
+    backlash_deg: 0.6
+    thermal_limit_c: 75.0
+    current_draw_a:
+      idle: 0.12
+      continuous: 2.0
+      stall: 8.0
+    voltage_v:
+      min: 11.1
+      nominal: 14.8
+      max: 16.8
+    driver_mass_kg: 0.012
+    notes: heavier fallback for joints that fail Stage 1 torque margin
