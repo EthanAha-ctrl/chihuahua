@@ -50,6 +50,7 @@ class Actuator:
 class Battery:
     name: str
     mass_kg: float
+    mount_frame: str
     placement_m: np.ndarray
     properties: Mapping[str, Any]
 
@@ -58,6 +59,7 @@ class Battery:
 class ElectronicsItem:
     name: str
     mass_kg: float
+    mount_frame: str
     placement_m: np.ndarray
     properties: Mapping[str, Any]
 
@@ -91,13 +93,23 @@ class LegChain:
     hip: np.ndarray
     knee: np.ndarray
     toe_joint: np.ndarray
-    toe_endpoint: np.ndarray
+    solved_toe_endpoint: np.ndarray
+    requested_toe_endpoint: np.ndarray
     ik_stretch_m: float
+
+    @property
+    def toe_endpoint(self) -> np.ndarray:
+        return self.solved_toe_endpoint
+
+    @property
+    def target_residual_m(self) -> float:
+        return float(np.linalg.norm(self.requested_toe_endpoint - self.solved_toe_endpoint))
 
 
 @dataclass(frozen=True)
 class HeadChain:
-    root: np.ndarray
+    body_anchor: np.ndarray
+    neck_origin: np.ndarray
     hinge: np.ndarray
     upper_hinge: np.ndarray
     lower_hinge: np.ndarray
@@ -199,6 +211,13 @@ def rot_z(theta: float) -> np.ndarray:
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=float)
 
 
+def rotate_about_axis(vector: np.ndarray, axis: np.ndarray, theta: float) -> np.ndarray:
+    axis = normalized(axis)
+    c = math.cos(theta)
+    s = math.sin(theta)
+    return vector * c + np.cross(axis, vector) * s + axis * float(np.dot(axis, vector)) * (1.0 - c)
+
+
 def normalized(vector: np.ndarray) -> np.ndarray:
     norm = float(np.linalg.norm(vector))
     if norm < 1e-12:
@@ -242,6 +261,13 @@ def placement_vector(parent: Mapping[str, Any], label: str) -> np.ndarray:
         required_float(placement, "y", f"{label}.placement_m"),
         required_float(placement, "z", f"{label}.placement_m"),
     )
+
+
+def mount_frame_value(parent: Mapping[str, Any], label: str) -> str:
+    value = str(parent.get("mount_frame", "")).strip()
+    if value not in {"rear", "waist", "front"}:
+        raise ValueError(f"{label}.mount_frame must be one of rear, waist, front")
+    return value
 
 
 def load_materials(path: Path) -> tuple[dict[str, Material], str, str]:
@@ -295,6 +321,7 @@ def load_battery_and_electronics(path: Path) -> tuple[Battery, list[ElectronicsI
     battery = Battery(
         name=default_battery,
         mass_kg=required_float(battery_map, "mass_kg", f"batteries.{default_battery}"),
+        mount_frame=mount_frame_value(battery_map, f"batteries.{default_battery}"),
         placement_m=placement_vector(battery_map, f"batteries.{default_battery}"),
         properties=battery_map,
     )
@@ -306,6 +333,7 @@ def load_battery_and_electronics(path: Path) -> tuple[Battery, list[ElectronicsI
             ElectronicsItem(
                 name=str(name),
                 mass_kg=required_float(item_map, "mass_kg", f"electronics.{name}"),
+                mount_frame=mount_frame_value(item_map, f"electronics.{name}"),
                 placement_m=placement_vector(item_map, f"electronics.{name}"),
                 properties=item_map,
             )
@@ -380,9 +408,8 @@ def make_body_pose(g: RobotGeometry, body_z_m: float, waist_yaw_deg: float, wais
     )
 
 
-def leg_endpoint_targets(g: RobotGeometry, waist_yaw_deg: float) -> dict[str, np.ndarray]:
-    waist_rad = math.radians(waist_yaw_deg)
-    foot_xy = foot_points(g, waist_rad)
+def leg_endpoint_targets(g: RobotGeometry) -> dict[str, np.ndarray]:
+    foot_xy = foot_points(g, 0.0)
     return {name: v3(float(point[0]), float(point[1]), 0.0) for name, point in foot_xy.items()}
 
 
@@ -393,43 +420,94 @@ def solve_leg_chain(
     toe_endpoint: np.ndarray,
 ) -> LegChain:
     hip = pose.hips[leg_name]
-    forward, _outward, down = pose.bases[leg_name]
+    forward, outward, down = pose.bases[leg_name]
     links = description.viewer.links
     hip_to_foot = toe_endpoint - hip
     toe_axis = normalized(hip_to_foot)
-    toe_joint = toe_endpoint - toe_axis * links.distal_endpoint_m
+    if float(np.linalg.norm(toe_axis)) < 1e-12:
+        toe_axis = down
+    requested_toe_joint = toe_endpoint - toe_axis * links.distal_endpoint_m
 
-    target = toe_joint - hip
-    x = float(np.dot(target, forward))
-    z = float(np.dot(target, down))
-    planar_dist = math.hypot(x, z)
+    target = requested_toe_joint - hip
+    target_dist = float(np.linalg.norm(target))
     upper = links.upper_m
     lower = links.lower_m
     min_reach = abs(upper - lower) + 1e-9
     max_reach = upper + lower - 1e-9
-    clamped_dist = min(max(planar_dist, min_reach), max_reach)
-    stretch = max(0.0, planar_dist - max_reach) + max(0.0, min_reach - planar_dist)
+    clamped_dist = min(max(target_dist, min_reach), max_reach)
+    stretch = max(0.0, target_dist - max_reach) + max(0.0, min_reach - target_dist)
 
-    target_angle = math.atan2(z, x)
-    cos_alpha = (upper * upper + clamped_dist * clamped_dist - lower * lower) / (2.0 * upper * clamped_dist)
-    alpha = math.acos(max(-1.0, min(1.0, cos_alpha)))
-    knee_angle = target_angle + alpha
-    knee = hip + forward * (upper * math.cos(knee_angle)) + down * (upper * math.sin(knee_angle))
+    target_dir = normalized(target)
+    if target_dist < 1e-12:
+        target_dir = down
+    bend_dir = down - target_dir * float(np.dot(down, target_dir))
+    if float(np.linalg.norm(bend_dir)) < 1e-12:
+        bend_dir = forward - target_dir * float(np.dot(forward, target_dir))
+    if float(np.linalg.norm(bend_dir)) < 1e-12:
+        bend_dir = outward - target_dir * float(np.dot(outward, target_dir))
+    bend_dir = normalized(bend_dir)
+
+    toe_joint = hip + target_dir * clamped_dist
+    solved_toe_endpoint = toe_joint + toe_axis * links.distal_endpoint_m
+
+    along = (upper * upper + clamped_dist * clamped_dist - lower * lower) / (2.0 * clamped_dist)
+    bend = math.sqrt(max(0.0, upper * upper - along * along))
+    knee = hip + target_dir * along + bend_dir * bend
     return LegChain(
         hip=hip,
         knee=knee,
         toe_joint=toe_joint,
-        toe_endpoint=toe_endpoint,
+        solved_toe_endpoint=solved_toe_endpoint,
+        requested_toe_endpoint=toe_endpoint,
         ik_stretch_m=stretch,
     )
 
 
-def make_head_chain(description: DogDescription, pose: BodyPose) -> HeadChain:
+def solve_leg_chain_from_angles(
+    description: DogDescription,
+    pose: BodyPose,
+    leg_name: str,
+    hip_ab_rad: float,
+    hip_pitch_rad: float,
+    knee_bend_rad: float,
+    toe_bend_rad: float,
+    requested_toe_endpoint: np.ndarray | None = None,
+) -> LegChain:
+    hip = pose.hips[leg_name]
+    forward, outward, down = pose.bases[leg_name]
+    links = description.viewer.links
+
+    hip_ab_axis = normalized(np.cross(down, outward))
+    leg_pitch_axis = normalized(-outward)
+
+    upper_dir = rotate_about_axis(down, hip_ab_axis, hip_ab_rad)
+    upper_dir = normalized(rotate_about_axis(upper_dir, leg_pitch_axis, hip_pitch_rad))
+    knee = hip + upper_dir * links.upper_m
+
+    lower_dir = normalized(rotate_about_axis(upper_dir, leg_pitch_axis, knee_bend_rad))
+    toe_joint = knee + lower_dir * links.lower_m
+
+    toe_dir = normalized(rotate_about_axis(lower_dir, leg_pitch_axis, toe_bend_rad))
+    toe_endpoint = toe_joint + toe_dir * links.distal_endpoint_m
+
+    return LegChain(
+        hip=hip,
+        knee=knee,
+        toe_joint=toe_joint,
+        solved_toe_endpoint=toe_endpoint,
+        requested_toe_endpoint=toe_endpoint if requested_toe_endpoint is None else requested_toe_endpoint,
+        ik_stretch_m=0.0,
+    )
+
+
+def make_head_chain_from_angles(
+    description: DogDescription,
+    pose: BodyPose,
+    neck_yaw: float,
+    neck_pitch: float,
+    claw_open: float,
+) -> HeadChain:
     claw = description.viewer.head_claw
-    ranges = description.joint_ranges
-    neck_yaw = math.radians(ranges["neck_yaw"].bias_deg)
-    neck_pitch = math.radians(ranges["neck_pitch"].bias_deg)
-    claw_open = math.radians(ranges["head_claw"].bias_deg)
 
     base_forward = pose.front_forward
     base_left = pose.front_left
@@ -440,20 +518,32 @@ def make_head_chain(description: DogDescription, pose: BodyPose) -> HeadChain:
     left = normalized(yaw_left)
     local_up = normalized(np.cross(forward, left))
 
-    root = pose.front_mid
-    neck_origin = root + base_forward * claw.root_forward_m + up * claw.root_up_m
+    body_anchor = pose.front_mid
+    neck_origin = body_anchor
     hinge = neck_origin + forward * claw.neck_length_m
     upper_hinge = hinge + local_up * claw.hinge_half_gap_m
     lower_hinge = hinge - local_up * claw.hinge_half_gap_m
     upper_tip = upper_hinge + claw.jaw_length_m * (forward * math.cos(claw_open) + local_up * math.sin(claw_open))
     lower_tip = lower_hinge + claw.jaw_length_m * (forward * math.cos(claw_open) - local_up * math.sin(claw_open))
     return HeadChain(
-        root=root,
+        body_anchor=body_anchor,
+        neck_origin=neck_origin,
         hinge=hinge,
         upper_hinge=upper_hinge,
         lower_hinge=lower_hinge,
         upper_tip=upper_tip,
         lower_tip=lower_tip,
+    )
+
+
+def make_head_chain(description: DogDescription, pose: BodyPose) -> HeadChain:
+    ranges = description.joint_ranges
+    return make_head_chain_from_angles(
+        description,
+        pose,
+        math.radians(ranges["neck_yaw"].bias_deg),
+        math.radians(ranges["neck_pitch"].bias_deg),
+        math.radians(ranges["head_claw"].bias_deg),
     )
 
 
@@ -490,19 +580,52 @@ def add_actuator_element(
     )
 
 
-def build_mass_model(
+def mounted_payload_position(
+    placement: np.ndarray,
+    mount_frame: str,
+    pose: BodyPose,
+    g: RobotGeometry,
+    body_z_m: float,
+) -> tuple[np.ndarray, str]:
+    world_up = v3(0.0, 0.0, 1.0)
+    if mount_frame == "front":
+        local = placement - v3(g.waist_joint_spacing, 0.0, body_z_m)
+        return (
+            pose.pitch_joint
+            + pose.front_forward * float(local[0])
+            + pose.front_left * float(local[1])
+            + pose.front_up * float(local[2]),
+            "front",
+        )
+    if mount_frame == "rear":
+        local = placement - v3(0.0, 0.0, body_z_m)
+        return pose.yaw_joint + v3(float(local[0]), float(local[1]), float(local[2])), "rear"
+
+    local = placement - v3(0.0, 0.0, body_z_m)
+    waist_forward = normalized(pose.pitch_joint - pose.yaw_joint)
+    if float(np.linalg.norm(waist_forward)) < 1e-12:
+        waist_forward = v3(1.0, 0.0, 0.0)
+    waist_left = normalized(np.cross(world_up, waist_forward))
+    return (
+        pose.yaw_joint
+        + waist_forward * float(local[0])
+        + waist_left * float(local[1])
+        + world_up * float(local[2]),
+        "waist",
+    )
+
+
+def build_mass_model_from_chains(
     case_name: str,
     description: DogDescription,
     catalog: PhysicalCatalog,
     assumptions: Stage1Assumptions,
-    waist_yaw_deg: float,
-    waist_pitch_deg: float,
+    pose: BodyPose,
+    legs: dict[str, LegChain],
+    head: HeadChain,
+    geometry: RobotGeometry | None = None,
 ) -> MassModel:
-    g = robot_geometry(description)
-    pose = make_body_pose(g, description.viewer.body_z_m, waist_yaw_deg, waist_pitch_deg)
-    targets = leg_endpoint_targets(g, waist_yaw_deg)
-    legs = {name: solve_leg_chain(description, pose, name, targets[name]) for name in LEG_ORDER}
-    head = make_head_chain(description, pose)
+    g = geometry or robot_geometry(description)
     structural = catalog.materials[catalog.structural_material]
     elastomer = catalog.materials[catalog.elastomer_material]
 
@@ -511,6 +634,13 @@ def build_mass_model(
     rear_body_com = pose.yaw_joint - np.array([1.0, 0.0, 0.0]) * (0.5 * g.rear_body_length)
     waist_com = 0.5 * (pose.yaw_joint + pose.pitch_joint)
 
+    battery_com, battery_mount = mounted_payload_position(
+        catalog.battery.placement_m,
+        catalog.battery.mount_frame,
+        pose,
+        g,
+        description.viewer.body_z_m,
+    )
     elements = [
         MassElement(
             name="front_body_shell",
@@ -558,19 +688,26 @@ def build_mass_model(
             name=f"battery_{catalog.battery.name}",
             kind="battery",
             mass_kg=catalog.battery.mass_kg,
-            com_m=catalog.battery.placement_m,
-            notes="battery placement from batteries.yaml",
+            com_m=battery_com,
+            notes=f"{battery_mount} mounted placement from batteries.yaml",
         ),
     ]
 
     for item in catalog.electronics:
+        item_com, item_mount = mounted_payload_position(
+            item.placement_m,
+            item.mount_frame,
+            pose,
+            g,
+            description.viewer.body_z_m,
+        )
         elements.append(
             MassElement(
                 name=f"electronics_{item.name}",
                 kind="electronics",
                 mass_kg=item.mass_kg,
-                com_m=item.placement_m,
-                notes="electronics placement from batteries.yaml",
+                com_m=item_com,
+                notes=f"{item_mount} mounted placement from batteries.yaml",
             )
         )
 
@@ -645,7 +782,7 @@ def build_mass_model(
         add_actuator_element(elements, catalog, "knee_bend", f"{leg_name}_knee_bend_actuator", chain.knee, leg_name, 1)
         add_actuator_element(elements, catalog, "toe_bend", f"{leg_name}_toe_bend_actuator", chain.toe_joint, leg_name, 2)
 
-    neck_len = float(np.linalg.norm(head.hinge - head.root))
+    neck_len = float(np.linalg.norm(head.hinge - head.neck_origin))
     upper_jaw_len = float(np.linalg.norm(head.upper_tip - head.upper_hinge))
     lower_jaw_len = float(np.linalg.norm(head.lower_tip - head.lower_hinge))
     elements.extend(
@@ -660,7 +797,7 @@ def build_mass_model(
                     assumptions.head_link_depth_m,
                     assumptions.head_equivalent_fill_fraction,
                 ),
-                com_m=0.5 * (head.root + head.hinge),
+                com_m=0.5 * (head.neck_origin + head.hinge),
                 material=structural.name,
                 notes="head-claw neck placeholder",
             ),
@@ -694,8 +831,8 @@ def build_mass_model(
             ),
         ]
     )
-    add_actuator_element(elements, catalog, "neck_yaw", "neck_yaw_actuator", head.root)
-    add_actuator_element(elements, catalog, "neck_pitch", "neck_pitch_actuator", head.root)
+    add_actuator_element(elements, catalog, "neck_yaw", "neck_yaw_actuator", head.neck_origin)
+    add_actuator_element(elements, catalog, "neck_pitch", "neck_pitch_actuator", head.neck_origin)
     add_actuator_element(elements, catalog, "head_claw", "head_claw_actuator", head.hinge)
 
     return MassModel(
@@ -706,6 +843,22 @@ def build_mass_model(
         head=head,
         elements=elements,
     )
+
+
+def build_mass_model(
+    case_name: str,
+    description: DogDescription,
+    catalog: PhysicalCatalog,
+    assumptions: Stage1Assumptions,
+    waist_yaw_deg: float,
+    waist_pitch_deg: float,
+) -> MassModel:
+    g = robot_geometry(description)
+    pose = make_body_pose(g, description.viewer.body_z_m, waist_yaw_deg, waist_pitch_deg)
+    targets = leg_endpoint_targets(g)
+    legs = {name: solve_leg_chain(description, pose, name, targets[name]) for name in LEG_ORDER}
+    head = make_head_chain(description, pose)
+    return build_mass_model_from_chains(case_name, description, catalog, assumptions, pose, legs, head, g)
 
 
 def joint_type_for_name(joint: str) -> str:
@@ -851,7 +1004,7 @@ def estimate_torques(
     raw["neck_yaw"] = (
         inertia_torque(
             named_elements(model, head_names),
-            model.head.root,
+            model.head.neck_origin,
             model.pose.front_up,
             assumptions.neck_angular_accel_rad_s2,
         ),
@@ -860,7 +1013,7 @@ def estimate_torques(
     raw["neck_pitch"] = (
         inertia_torque(
             named_elements(model, head_names),
-            model.head.root,
+            model.head.neck_origin,
             model.pose.front_left,
             assumptions.neck_angular_accel_rad_s2,
         ),
@@ -973,11 +1126,21 @@ def case_torque_summary(case_name: str, rows: list[TorqueRow]) -> tuple[TorqueRo
     return worst_margin, worst_required
 
 
+def max_ik_stretch_m(model: MassModel) -> float:
+    return max((chain.ik_stretch_m for chain in model.legs.values()), default=0.0)
+
+
+def max_target_residual_m(model: MassModel) -> float:
+    return max((chain.target_residual_m for chain in model.legs.values()), default=0.0)
+
+
 def write_case_summary_csv(case_records: list[CaseRecord], rows: list[TorqueRow], path: Path) -> None:
     fields = [
         "case_name",
         "waist_yaw_deg",
         "waist_pitch_deg",
+        "max_ik_stretch_m",
+        "max_target_residual_m",
         "total_mass_kg",
         "com_x_m",
         "com_y_m",
@@ -998,6 +1161,8 @@ def write_case_summary_csv(case_records: list[CaseRecord], rows: list[TorqueRow]
                     "case_name": record.case_name,
                     "waist_yaw_deg": f"{record.waist_yaw_deg:.9g}",
                     "waist_pitch_deg": f"{record.waist_pitch_deg:.9g}",
+                    "max_ik_stretch_m": f"{max_ik_stretch_m(record.model):.9g}",
+                    "max_target_residual_m": f"{max_target_residual_m(record.model):.9g}",
                     "total_mass_kg": f"{record.model.total_mass_kg:.9g}",
                     "com_x_m": f"{com[0]:.9g}",
                     "com_y_m": f"{com[1]:.9g}",
@@ -1008,6 +1173,63 @@ def write_case_summary_csv(case_records: list[CaseRecord], rows: list[TorqueRow]
                     "max_required_torque_nm": f"{worst_required.required_torque_nm:.9g}",
                 }
             )
+
+
+def write_leg_endpoint_summary_csv(case_records: list[CaseRecord], path: Path) -> None:
+    fields = [
+        "case_name",
+        "waist_yaw_deg",
+        "waist_pitch_deg",
+        "leg",
+        "ik_stretch_m",
+        "target_residual_m",
+        "requested_toe_x_m",
+        "requested_toe_y_m",
+        "requested_toe_z_m",
+        "solved_toe_x_m",
+        "solved_toe_y_m",
+        "solved_toe_z_m",
+        "toe_joint_x_m",
+        "toe_joint_y_m",
+        "toe_joint_z_m",
+        "knee_x_m",
+        "knee_y_m",
+        "knee_z_m",
+        "hip_x_m",
+        "hip_y_m",
+        "hip_z_m",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for record in case_records:
+            for leg_name in LEG_ORDER:
+                chain = record.model.legs[leg_name]
+                writer.writerow(
+                    {
+                        "case_name": record.case_name,
+                        "waist_yaw_deg": f"{record.waist_yaw_deg:.9g}",
+                        "waist_pitch_deg": f"{record.waist_pitch_deg:.9g}",
+                        "leg": leg_name,
+                        "ik_stretch_m": f"{chain.ik_stretch_m:.9g}",
+                        "target_residual_m": f"{chain.target_residual_m:.9g}",
+                        "requested_toe_x_m": f"{chain.requested_toe_endpoint[0]:.9g}",
+                        "requested_toe_y_m": f"{chain.requested_toe_endpoint[1]:.9g}",
+                        "requested_toe_z_m": f"{chain.requested_toe_endpoint[2]:.9g}",
+                        "solved_toe_x_m": f"{chain.solved_toe_endpoint[0]:.9g}",
+                        "solved_toe_y_m": f"{chain.solved_toe_endpoint[1]:.9g}",
+                        "solved_toe_z_m": f"{chain.solved_toe_endpoint[2]:.9g}",
+                        "toe_joint_x_m": f"{chain.toe_joint[0]:.9g}",
+                        "toe_joint_y_m": f"{chain.toe_joint[1]:.9g}",
+                        "toe_joint_z_m": f"{chain.toe_joint[2]:.9g}",
+                        "knee_x_m": f"{chain.knee[0]:.9g}",
+                        "knee_y_m": f"{chain.knee[1]:.9g}",
+                        "knee_z_m": f"{chain.knee[2]:.9g}",
+                        "hip_x_m": f"{chain.hip[0]:.9g}",
+                        "hip_y_m": f"{chain.hip[1]:.9g}",
+                        "hip_z_m": f"{chain.hip[2]:.9g}",
+                    }
+                )
 
 
 def summary_dict(
@@ -1055,6 +1277,8 @@ def summary_dict(
                 "case_name": record.case_name,
                 "waist_yaw_deg": float(record.waist_yaw_deg),
                 "waist_pitch_deg": float(record.waist_pitch_deg),
+                "max_ik_stretch_m": float(max_ik_stretch_m(record.model)),
+                "max_target_residual_m": float(max_target_residual_m(record.model)),
                 "com_m": {
                     "x": float(record.model.com_m[0]),
                     "y": float(record.model.com_m[1]),
@@ -1156,6 +1380,7 @@ def main() -> None:
     write_mass_elements_csv(neutral_model, out_dir / "mass_elements.csv")
     write_torque_csv(all_rows, out_dir / "joint_torque_estimate.csv")
     write_case_summary_csv(case_records, all_rows, out_dir / "case_summary.csv")
+    write_leg_endpoint_summary_csv(case_records, out_dir / "leg_endpoint_summary.csv")
     write_summary_yaml(neutral_model, all_rows, catalog, case_records, out_dir / "mass_summary.yaml")
     print_summary(out_dir, neutral_model, all_rows)
 

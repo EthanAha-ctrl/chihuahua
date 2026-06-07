@@ -91,12 +91,6 @@ viewer:
       visual_tuning: false
       value: 0.045
   head_claw:
-    root_forward_m:
-      visual_tuning: false
-      value: 0.038
-    root_up_m:
-      visual_tuning: false
-      value: 0.014
     neck_length_m:
       visual_tuning: false
       value: 0.078

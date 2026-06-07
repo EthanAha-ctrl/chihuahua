@@ -65,8 +65,6 @@ class LinkDescription:
 
 @dataclass
 class HeadClawDescription:
-    root_forward_m: float
-    root_up_m: float
     neck_length_m: float
     hinge_half_gap_m: float
     jaw_length_m: float
@@ -225,8 +223,6 @@ def _load_viewer(data: Mapping[str, Any]) -> ViewerDescription:
         link_values[attr_name], link_flags[attr_name] = _scalar_value_and_flag(links, yaml_key, "viewer.links_m")
 
     claw_keys = (
-        "root_forward_m",
-        "root_up_m",
         "neck_length_m",
         "hinge_half_gap_m",
         "jaw_length_m",
@@ -245,8 +241,6 @@ def _load_viewer(data: Mapping[str, Any]) -> ViewerDescription:
             visual_tuning=link_flags,
         ),
         head_claw=HeadClawDescription(
-            root_forward_m=claw_values["root_forward_m"],
-            root_up_m=claw_values["root_up_m"],
             neck_length_m=claw_values["neck_length_m"],
             hinge_half_gap_m=claw_values["hinge_half_gap_m"],
             jaw_length_m=claw_values["jaw_length_m"],
@@ -357,10 +351,8 @@ def save_dog_description(path: Path, description: DogDescription) -> None:
         )
     viewer["links_m"] = links
 
-    head_claw = dict(_required_mapping(viewer, "head_claw", "viewer"))
+    head_claw = {}
     for key in (
-        "root_forward_m",
-        "root_up_m",
         "neck_length_m",
         "hinge_half_gap_m",
         "jaw_length_m",

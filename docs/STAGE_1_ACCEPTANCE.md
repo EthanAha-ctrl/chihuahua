@@ -18,6 +18,8 @@ Stage 1 currently covers:
 - Use the same Stage 1 model for the mass viewer pose and telemetry.
 - Place battery and electronics by explicit `mount_frame` values:
   `rear`, `waist`, or `front`.
+- Keep the head/neck anchor on the upper body: Stage 1 has no head/neck root
+  offset, and `neck_origin == body_anchor` is intentional.
 
 ## Required Outputs
 

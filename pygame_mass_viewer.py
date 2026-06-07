@@ -13,7 +13,7 @@ electromechanical overlay:
 - hip -> knee -> toe joint -> toe endpoint links
 - live mass / COM / point-mass inertia estimate
 - live free-space inertial torque estimate
-- material property drag bars
+- material density drag bar
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ try:
 except ModuleNotFoundError as exc:
     raise SystemExit("pygame is required. Install dependencies with: uv sync") from exc
 
-from endpoint_geometry import LEG_ORDER, RobotGeometry, waist_joint_points
+from endpoint_geometry import LEG_ORDER
 import mass_model as stage1
 from dog_description import (
     DEFAULT_DESCRIPTION_PATH,
@@ -144,16 +144,6 @@ class MaterialOverlay:
 
 
 @dataclass(frozen=True)
-class BodyPose:
-    yaw_joint: np.ndarray
-    pitch_joint: np.ndarray
-    front_mid: np.ndarray
-    rear_mid: np.ndarray
-    hips: dict[str, np.ndarray]
-    bases: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]
-
-
-@dataclass(frozen=True)
 class Stage1Telemetry:
     catalog: stage1.PhysicalCatalog
     model: stage1.MassModel
@@ -164,19 +154,6 @@ class Stage1Telemetry:
 
 def v3(x: float, y: float, z: float = 0.0) -> np.ndarray:
     return np.array([x, y, z], dtype=float)
-
-
-def rot_z(theta: float) -> np.ndarray:
-    c = math.cos(theta)
-    s = math.sin(theta)
-    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=float)
-
-
-def rotate_about_axis(vector: np.ndarray, axis: np.ndarray, theta: float) -> np.ndarray:
-    axis = normalized(axis)
-    c = math.cos(theta)
-    s = math.sin(theta)
-    return vector * c + np.cross(axis, vector) * s + axis * float(np.dot(axis, vector)) * (1.0 - c)
 
 
 def stable_seed(key: str) -> int:
@@ -309,186 +286,33 @@ def draw_grid(commands: list[DrawCommand], camera: Camera, screen_size: tuple[in
     add_line(commands, camera, screen_size, v3(0.0, -0.50, 0.0), v3(0.0, 0.50, 0.0), (105, 118, 134), 2)
 
 
-def normalized(vector: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(vector))
-    if norm < 1e-12:
-        return vector
-    return vector / norm
-
-
-def make_body_pose(g: RobotGeometry, viewer: ViewerState, description: DogDescription) -> BodyPose:
-    waist_yaw_rad = math.radians(viewer.waist_deg)
-    waist_pitch_rad = math.radians(viewer.waist_pitch_deg)
-    yaw_xy, pitch_xy = waist_joint_points(g, waist_yaw_rad)
-    body_z = description.viewer.body_z_m
-    yaw_joint = v3(float(yaw_xy[0]), float(yaw_xy[1]), body_z)
-    pitch_joint = v3(float(pitch_xy[0]), float(pitch_xy[1]), body_z)
-
-    rear_yaw = rot_z(0.0)
-    front_yaw = rot_z(waist_yaw_rad)
-    rear_forward = rear_yaw @ np.array([1.0, 0.0, 0.0])
-    rear_left = rear_yaw @ np.array([0.0, 1.0, 0.0])
-    rear_up = np.array([0.0, 0.0, 1.0])
-
-    front_forward_level = front_yaw @ np.array([1.0, 0.0, 0.0])
-    front_left = front_yaw @ np.array([0.0, 1.0, 0.0])
-    world_up = np.array([0.0, 0.0, 1.0])
-    front_forward = normalized(
-        front_forward_level * math.cos(waist_pitch_rad) + world_up * math.sin(waist_pitch_rad)
-    )
-    front_up = normalized(np.cross(front_forward, front_left))
-
-    front_mid = pitch_joint + front_forward * g.front_body_length
-    rear_mid = yaw_joint - rear_forward * g.rear_body_length
-
-    hips: dict[str, np.ndarray] = {}
-    bases: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-    for name in LEG_ORDER:
-        side = 1.0 if name.endswith("left") else -1.0
-        if name.startswith("front"):
-            outward = side * front_left
-            hips[name] = front_mid + outward * g.hip_half_width
-            bases[name] = (front_forward, outward, -front_up)
-        else:
-            outward = side * rear_left
-            hips[name] = rear_mid + outward * g.hip_half_width
-            bases[name] = (rear_forward, outward, -rear_up)
-
-    return BodyPose(
-        yaw_joint=yaw_joint,
-        pitch_joint=pitch_joint,
-        front_mid=front_mid,
-        rear_mid=rear_mid,
-        hips=hips,
-        bases=bases,
-    )
-
-
-def leg_chain(
-    viewer: ViewerState,
-    description: DogDescription,
-    name: str,
-    hip: np.ndarray,
-    basis: tuple[np.ndarray, np.ndarray, np.ndarray],
-) -> dict[str, np.ndarray]:
-    forward, outward, down = basis
-    links = description.viewer.links
-    ranges = description.joint_ranges
-
-    hip_ab = ranged_joint_angle(viewer, f"{name}:hip_ab", ranges["hip_ab"])
-    hip_pitch = ranged_joint_angle(viewer, f"{name}:hip_pitch", ranges["hip_pitch"])
-    knee_bend = ranged_joint_angle(viewer, f"{name}:knee_bend", ranges["knee_bend"])
-    toe_bend = ranged_joint_angle(viewer, f"{name}:toe_bend", ranges["toe_bend"])
-
-    hip_ab_axis = normalized(np.cross(down, outward))
-    leg_pitch_axis = normalized(-outward)
-
-    upper_dir = rotate_about_axis(down, hip_ab_axis, hip_ab)
-    upper_dir = normalized(rotate_about_axis(upper_dir, leg_pitch_axis, hip_pitch))
-    upper = upper_dir * links.upper_m
-    knee = hip + upper
-
-    lower_dir = normalized(rotate_about_axis(upper_dir, leg_pitch_axis, knee_bend))
-    lower = lower_dir * links.lower_m
-    toe_joint = knee + lower
-
-    toe_dir = normalized(rotate_about_axis(lower_dir, leg_pitch_axis, toe_bend))
-    toe = toe_dir * links.distal_endpoint_m
-    toe_endpoint = toe_joint + toe
-
-    return {
-        "hip": hip,
-        "knee": knee,
-        "toe_joint": toe_joint,
-        "toe_endpoint": toe_endpoint,
-    }
-
-
-def head_claw_chain(
-    viewer: ViewerState,
-    description: DogDescription,
-    front_anchor: np.ndarray,
-    front_forward: np.ndarray,
-    front_left: np.ndarray,
-    front_up: np.ndarray,
-) -> dict[str, np.ndarray]:
-    base_forward = front_forward
-    base_left = front_left
-    up = front_up
-    ranges = description.joint_ranges
-    claw = description.viewer.head_claw
-
-    neck_yaw = ranged_joint_angle(viewer, "neck:yaw", ranges["neck_yaw"])
-    neck_pitch = ranged_joint_angle(viewer, "neck:pitch", ranges["neck_pitch"])
-    claw_open = ranged_joint_angle(viewer, "head:claw", ranges["head_claw"])
-
-    yaw_forward = base_forward * math.cos(neck_yaw) + base_left * math.sin(neck_yaw)
-    yaw_left = -base_forward * math.sin(neck_yaw) + base_left * math.cos(neck_yaw)
-    forward = yaw_forward * math.cos(neck_pitch) + up * math.sin(neck_pitch)
-    forward = forward / np.linalg.norm(forward)
-    left = yaw_left / np.linalg.norm(yaw_left)
-    local_up = np.cross(forward, left)
-    local_up = local_up / np.linalg.norm(local_up)
-
-    root = front_anchor
-    neck_origin = root + base_forward * claw.root_forward_m + up * claw.root_up_m
-    hinge = neck_origin + forward * claw.neck_length_m
-    upper_hinge = hinge + local_up * claw.hinge_half_gap_m
-    lower_hinge = hinge - local_up * claw.hinge_half_gap_m
-    jaw_len = claw.jaw_length_m
-    upper_tip = upper_hinge + jaw_len * (forward * math.cos(claw_open) + local_up * math.sin(claw_open))
-    lower_tip = lower_hinge + jaw_len * (forward * math.cos(claw_open) - local_up * math.sin(claw_open))
-
-    return {
-        "root": root,
-        "hinge": hinge,
-        "upper_hinge": upper_hinge,
-        "lower_hinge": lower_hinge,
-        "upper_tip": upper_tip,
-        "lower_tip": lower_tip,
-    }
-
-
 def add_head_claw(
     commands: list[DrawCommand],
     viewer: ViewerState,
-    description: DogDescription,
     telemetry: Stage1Telemetry,
-    front_anchor: np.ndarray,
-    front_forward: np.ndarray,
-    front_left: np.ndarray,
-    front_up: np.ndarray,
+    head: stage1.HeadChain,
     screen_size: tuple[int, int],
 ) -> None:
-    chain = head_claw_chain(viewer, description, front_anchor, front_forward, front_left, front_up)
-    root = chain["root"]
-    hinge = chain["hinge"]
-    upper_hinge = chain["upper_hinge"]
-    lower_hinge = chain["lower_hinge"]
-    upper_tip = chain["upper_tip"]
-    lower_tip = chain["lower_tip"]
-
     color = LINK_GRAY
     jaw_color = LINK_GRAY
-    add_line(commands, viewer.camera, screen_size, root, hinge, color, 4)
-    add_line(commands, viewer.camera, screen_size, upper_hinge, lower_hinge, color, 3)
-    add_line(commands, viewer.camera, screen_size, upper_hinge, upper_tip, jaw_color, 4)
-    add_line(commands, viewer.camera, screen_size, lower_hinge, lower_tip, jaw_color, 4)
-    add_joint(commands, viewer.camera, screen_size, root, 4, torque_joint_color(telemetry, ("neck_yaw", "neck_pitch")))
-    add_joint(commands, viewer.camera, screen_size, upper_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
-    add_joint(commands, viewer.camera, screen_size, lower_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
+    add_line(commands, viewer.camera, screen_size, head.body_anchor, head.neck_origin, color, 3)
+    add_line(commands, viewer.camera, screen_size, head.neck_origin, head.hinge, color, 4)
+    add_line(commands, viewer.camera, screen_size, head.upper_hinge, head.lower_hinge, color, 3)
+    add_line(commands, viewer.camera, screen_size, head.upper_hinge, head.upper_tip, jaw_color, 4)
+    add_line(commands, viewer.camera, screen_size, head.lower_hinge, head.lower_tip, jaw_color, 4)
+    add_joint(commands, viewer.camera, screen_size, head.neck_origin, 4, torque_joint_color(telemetry, ("neck_yaw", "neck_pitch")))
+    add_joint(commands, viewer.camera, screen_size, head.upper_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
+    add_joint(commands, viewer.camera, screen_size, head.lower_hinge, 4, torque_joint_color(telemetry, ("head_claw",)))
 
 
 def add_linkage_scene(
     commands: list[DrawCommand],
-    g: RobotGeometry,
     viewer: ViewerState,
-    description: DogDescription,
     telemetry: Stage1Telemetry,
     screen_size: tuple[int, int],
 ) -> dict[str, float]:
     draw_grid(commands, viewer.camera, screen_size)
-    pose = make_body_pose(g, viewer, description)
+    pose = telemetry.model.pose
     hips = pose.hips
 
     add_line(commands, viewer.camera, screen_size, pose.yaw_joint, pose.pitch_joint, LINK_GRAY, 5)
@@ -498,34 +322,24 @@ def add_linkage_scene(
     add_line(commands, viewer.camera, screen_size, hips["rear_left"], hips["rear_right"], LINK_GRAY, 4)
     add_joint(commands, viewer.camera, screen_size, pose.yaw_joint, 7, torque_joint_color(telemetry, ("waist_yaw",)))
     add_joint(commands, viewer.camera, screen_size, pose.pitch_joint, 7, torque_joint_color(telemetry, ("waist_pitch",)))
-    front_forward, front_outward, front_down = pose.bases["front_left"]
-    front_left = front_outward
-    front_up = -front_down
-    add_head_claw(
-        commands,
-        viewer,
-        description,
-        telemetry,
-        pose.front_mid,
-        front_forward,
-        front_left,
-        front_up,
-        screen_size,
-    )
+    add_head_claw(commands, viewer, telemetry, telemetry.model.head, screen_size)
 
     toe_endpoints: list[np.ndarray] = []
+    target_endpoints: list[np.ndarray] = []
+    stretches: list[float] = []
+    residuals: list[float] = []
     for name in LEG_ORDER:
-        chain = leg_chain(viewer, description, name, hips[name], pose.bases[name])
+        chain = telemetry.model.legs[name]
 
-        add_line(commands, viewer.camera, screen_size, chain["hip"], chain["knee"], LINK_GRAY, 4)
-        add_line(commands, viewer.camera, screen_size, chain["knee"], chain["toe_joint"], LINK_GRAY, 4)
-        add_line(commands, viewer.camera, screen_size, chain["toe_joint"], chain["toe_endpoint"], LINK_GRAY, 4)
+        add_line(commands, viewer.camera, screen_size, chain.hip, chain.knee, LINK_GRAY, 4)
+        add_line(commands, viewer.camera, screen_size, chain.knee, chain.toe_joint, LINK_GRAY, 4)
+        add_line(commands, viewer.camera, screen_size, chain.toe_joint, chain.toe_endpoint, LINK_GRAY, 4)
 
         add_joint(
             commands,
             viewer.camera,
             screen_size,
-            chain["hip"],
+            chain.hip,
             5,
             torque_joint_color(telemetry, (f"{name}_hip_ab", f"{name}_hip_pitch")),
         )
@@ -533,7 +347,7 @@ def add_linkage_scene(
             commands,
             viewer.camera,
             screen_size,
-            chain["knee"],
+            chain.knee,
             5,
             torque_joint_color(telemetry, (f"{name}_knee_bend",)),
         )
@@ -541,32 +355,69 @@ def add_linkage_scene(
             commands,
             viewer.camera,
             screen_size,
-            chain["toe_joint"],
+            chain.toe_joint,
             5,
             torque_joint_color(telemetry, (f"{name}_toe_bend",)),
         )
-        add_joint(commands, viewer.camera, screen_size, chain["toe_endpoint"], 4, JOINT_GRAY, scale_radius=False)
-        toe_endpoints.append(chain["toe_endpoint"])
+        add_joint(commands, viewer.camera, screen_size, chain.toe_endpoint, 4, JOINT_GRAY, scale_radius=False)
+        target_residual = chain.target_residual_m
+        toe_endpoints.append(chain.toe_endpoint)
+        target_endpoints.append(chain.requested_toe_endpoint)
+        stretches.append(chain.ik_stretch_m)
+        residuals.append(target_residual)
 
-    reaches = [float(np.linalg.norm(p[:2] - hips[name][:2])) for p, name in zip(toe_endpoints, LEG_ORDER)]
+    reaches = [float(np.linalg.norm(p[:2] - hips[name][:2])) for p, name in zip(target_endpoints, LEG_ORDER)]
     return {
         "max_reach_xy": max(reaches),
         "mean_reach_xy": float(np.mean(reaches)),
         "max_toe_z": max(float(p[2]) for p in toe_endpoints),
         "min_toe_z": min(float(p[2]) for p in toe_endpoints),
+        "max_ik_stretch_m": max(stretches, default=0.0),
+        "max_target_residual_m": max(residuals, default=0.0),
     }
 
 
 def make_scene_commands(
-    g: RobotGeometry,
     viewer: ViewerState,
-    description: DogDescription,
     telemetry: Stage1Telemetry,
     screen_size: tuple[int, int],
 ) -> tuple[list[DrawCommand], dict[str, float]]:
     commands: list[DrawCommand] = []
-    metrics = add_linkage_scene(commands, g, viewer, description, telemetry, screen_size)
+    metrics = add_linkage_scene(commands, viewer, telemetry, screen_size)
     return commands, metrics
+
+
+def make_live_stage1_model(
+    description: DogDescription,
+    viewer: ViewerState,
+    catalog: stage1.PhysicalCatalog,
+) -> stage1.MassModel:
+    assumptions = stage1.Stage1Assumptions()
+    geometry = stage1.robot_geometry(description)
+    pose = stage1.make_body_pose(geometry, description.viewer.body_z_m, viewer.waist_deg, viewer.waist_pitch_deg)
+    ranges = description.joint_ranges
+    targets = stage1.leg_endpoint_targets(geometry)
+    legs = {
+        name: stage1.solve_leg_chain_from_angles(
+            description,
+            pose,
+            name,
+            ranged_joint_angle(viewer, f"{name}:hip_ab", ranges["hip_ab"]),
+            ranged_joint_angle(viewer, f"{name}:hip_pitch", ranges["hip_pitch"]),
+            ranged_joint_angle(viewer, f"{name}:knee_bend", ranges["knee_bend"]),
+            ranged_joint_angle(viewer, f"{name}:toe_bend", ranges["toe_bend"]),
+            targets[name],
+        )
+        for name in LEG_ORDER
+    }
+    head = stage1.make_head_chain_from_angles(
+        description,
+        pose,
+        ranged_joint_angle(viewer, "neck:yaw", ranges["neck_yaw"]),
+        ranged_joint_angle(viewer, "neck:pitch", ranges["neck_pitch"]),
+        ranged_joint_angle(viewer, "head:claw", ranges["head_claw"]),
+    )
+    return stage1.build_mass_model_from_chains("viewer_live", description, catalog, assumptions, pose, legs, head, geometry)
 
 
 def make_stage1_telemetry(
@@ -574,14 +425,7 @@ def make_stage1_telemetry(
     viewer: ViewerState,
     catalog: stage1.PhysicalCatalog,
 ) -> Stage1Telemetry:
-    model = stage1.build_mass_model(
-        "viewer_live",
-        description,
-        catalog,
-        stage1.Stage1Assumptions(),
-        viewer.waist_deg,
-        viewer.waist_pitch_deg,
-    )
+    model = make_live_stage1_model(description, viewer, catalog)
     rows = stage1.estimate_torques(model, catalog, stage1.Stage1Assumptions())
     finite_rows = [row for row in rows if row.continuous_margin is not None]
     worst_margin = min(finite_rows, key=lambda row: row.continuous_margin or math.inf)
@@ -602,7 +446,7 @@ def joint_position_for_row(model: stage1.MassModel, row: stage1.TorqueRow) -> np
     if joint == "waist_pitch":
         return model.pose.pitch_joint
     if joint in {"neck_yaw", "neck_pitch"}:
-        return model.head.root
+        return model.head.neck_origin
     if joint == "head_claw":
         return model.head.hinge
 
@@ -686,19 +530,12 @@ def build_material_overlay(catalog: stage1.PhysicalCatalog) -> MaterialOverlay:
     props = material.properties
     specs = (
         ("density_kg_m3", "density", "kg/m3", 1.0, 0.50, 1.50),
-        ("youngs_modulus_pa", "Young", "GPa", 1e-9, 0.35, 1.75),
-        ("yield_strength_pa", "yield", "MPa", 1e-6, 0.35, 1.75),
-        ("layer_adhesion_strength_pa", "layer", "MPa", 1e-6, 0.25, 1.75),
-        ("anisotropy_factor", "anisotropy", "", 1.0, 0.20, 1.00),
     )
     controls: list[MaterialControl] = []
     for key, label, unit, scale, low_factor, high_factor in specs:
         value = float(props[key])
         lower = value * low_factor
         upper = value * high_factor
-        if key == "anisotropy_factor":
-            lower = low_factor
-            upper = high_factor
         controls.append(
             MaterialControl(
                 property_key=key,
@@ -861,7 +698,7 @@ def draw_material_overlay(
     scale_label = small_font.render(f"joint torque 0..{max_torque:.3f} Nm", True, (158, 169, 181))
     screen.blit(scale_label, (bar_rect.right + 18, bar_rect.y - 6))
 
-    status = overlay.status or "drag material bars"
+    status = overlay.status or "drag density bar"
     status_surface = small_font.render(status, True, (139, 151, 164))
     screen.blit(status_surface, (panel.x + 20, panel.bottom - 38))
 
@@ -1202,7 +1039,10 @@ def draw_text_panel(
         ),
         f"largest torque {telemetry.largest_torque.joint} {telemetry.largest_torque.required_torque_nm:.3f} Nm",
         f"joint fill seismic scale 0..{telemetry.largest_torque.required_torque_nm:.3f} Nm global",
-        f"max XY toe reach {metrics['max_reach_xy']:.3f} m | toe z {metrics['min_toe_z']:.3f}..{metrics['max_toe_z']:.3f} m",
+        (
+            f"max XY target reach {metrics['max_reach_xy']:.3f} m | target residual {metrics['max_target_residual_m']:.3f} m "
+            f"| toe z {metrics['min_toe_z']:.3f}..{metrics['max_toe_z']:.3f} m"
+        ),
         "rough placeholders | no CAD mass, no FEM, no controller",
     ]
     if viewer.dof_solo:
@@ -1381,10 +1221,9 @@ def run_viewer(args: argparse.Namespace) -> None:
         )
 
         screen.fill((12, 15, 19))
-        geometry = RobotGeometry(**description.geometry.robot_geometry_kwargs())
         live_catalog = live_catalog_with_material_overlay(base_catalog, material_overlay)
         telemetry = make_stage1_telemetry(description, viewer, live_catalog)
-        commands, metrics = make_scene_commands(geometry, viewer, description, telemetry, screen.get_size())
+        commands, metrics = make_scene_commands(viewer, telemetry, screen.get_size())
         add_stage1_markers(commands, viewer, telemetry, screen.get_size())
         render_commands(screen, commands)
         draw_text_panel(screen, font, small_font, viewer, metrics, telemetry, clock.get_fps())

@@ -387,8 +387,8 @@ def head_claw_chain(
     local_up = np.cross(forward, left)
     local_up = local_up / np.linalg.norm(local_up)
 
-    root = front_anchor
-    neck_origin = root + base_forward * claw.root_forward_m + up * claw.root_up_m
+    body_anchor = front_anchor
+    neck_origin = body_anchor
     hinge = neck_origin + forward * claw.neck_length_m
     upper_hinge = hinge + local_up * claw.hinge_half_gap_m
     lower_hinge = hinge - local_up * claw.hinge_half_gap_m
@@ -397,7 +397,8 @@ def head_claw_chain(
     lower_tip = lower_hinge + jaw_len * (forward * math.cos(claw_open) - local_up * math.sin(claw_open))
 
     return {
-        "root": root,
+        "body_anchor": body_anchor,
+        "neck_origin": neck_origin,
         "hinge": hinge,
         "upper_hinge": upper_hinge,
         "lower_hinge": lower_hinge,
@@ -417,7 +418,8 @@ def add_head_claw(
     screen_size: tuple[int, int],
 ) -> None:
     chain = head_claw_chain(viewer, description, front_anchor, front_forward, front_left, front_up)
-    root = chain["root"]
+    body_anchor = chain["body_anchor"]
+    neck_origin = chain["neck_origin"]
     hinge = chain["hinge"]
     upper_hinge = chain["upper_hinge"]
     lower_hinge = chain["lower_hinge"]
@@ -426,11 +428,12 @@ def add_head_claw(
 
     color = (198, 224, 255)
     jaw_color = (255, 215, 118)
-    add_line(commands, viewer.camera, screen_size, root, hinge, color, 4)
+    add_line(commands, viewer.camera, screen_size, body_anchor, neck_origin, color, 3)
+    add_line(commands, viewer.camera, screen_size, neck_origin, hinge, color, 4)
     add_line(commands, viewer.camera, screen_size, upper_hinge, lower_hinge, color, 3)
     add_line(commands, viewer.camera, screen_size, upper_hinge, upper_tip, jaw_color, 4)
     add_line(commands, viewer.camera, screen_size, lower_hinge, lower_tip, jaw_color, 4)
-    add_joint(commands, viewer.camera, screen_size, root, 4, color)
+    add_joint(commands, viewer.camera, screen_size, neck_origin, 4, color)
     add_joint(commands, viewer.camera, screen_size, upper_hinge, 4, jaw_color)
     add_joint(commands, viewer.camera, screen_size, lower_hinge, 4, jaw_color)
 
