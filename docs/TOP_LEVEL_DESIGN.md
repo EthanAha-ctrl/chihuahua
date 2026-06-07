@@ -452,8 +452,9 @@ next design decision
 3. Add link mass and COM calculation.
 4. Add static torque estimation for representative poses.
 5. Add versioned design reports.
-6. Prepare whole-robot FEM export / load-case generation.
-7. Later add IK and MuJoCo export.
+6. Document external Stage 2 FEM dependencies.
+7. Prepare whole-robot FEM export / load-case generation.
+8. Later add IK and MuJoCo export.
 ```
 
 建议新增文件结构：

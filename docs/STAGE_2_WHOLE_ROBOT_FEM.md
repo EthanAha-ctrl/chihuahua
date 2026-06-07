@@ -4,6 +4,8 @@
 
 这一阶段只做 whole-robot FEM。不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 分析路线。局部问题必须通过整机模型暴露、修改和复验。
 
+外部工具依赖记录在 `docs/EXTERNAL_DEPENDENCIES.md`。Stage 2 依赖 OpenRadioss、OpenRadioss result conversion 和 ParaView，但仓库不记录本机安装路径、环境变量或自动探测逻辑。
+
 ## 1. FEM 输入模型
 
 - 读取 `dog_description.yaml`
@@ -101,6 +103,9 @@ whole-robot FEM stress / deformation hot spot
 
 - whole-robot OpenRadioss case files
 - whole-robot load-case table
+- VTK visualization files
+- CSV time-series files
+- ParaView screenshots
 - material / print-orientation assumptions
 - joint / shaft / bearing / fastener connection assumptions
 - global deformation report
