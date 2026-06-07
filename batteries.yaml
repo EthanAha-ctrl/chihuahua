@@ -1,11 +1,12 @@
 # Stage 1 battery and electronics placeholders.
-# Placement is expressed in the robot world frame used by endpoint_geometry.py.
+# Placement is expressed in the neutral robot frame and mounted by mount_frame.
 
 default_battery: lipo_3s_1500mah
 
 batteries:
   lipo_2s_850mah:
     mass_kg: 0.052
+    mount_frame: waist
     dimensions_m:
       x: 0.060
       y: 0.031
@@ -22,6 +23,7 @@ batteries:
 
   lipo_3s_1500mah:
     mass_kg: 0.135
+    mount_frame: waist
     dimensions_m:
       x: 0.073
       y: 0.035
@@ -38,6 +40,7 @@ batteries:
 
   lipo_4s_2200mah:
     mass_kg: 0.240
+    mount_frame: rear
     dimensions_m:
       x: 0.105
       y: 0.035
@@ -55,6 +58,7 @@ batteries:
 electronics:
   controller:
     mass_kg: 0.045
+    mount_frame: front
     dimensions_m:
       x: 0.055
       y: 0.040
@@ -65,6 +69,7 @@ electronics:
       z: 0.245
   power_distribution:
     mass_kg: 0.025
+    mount_frame: rear
     dimensions_m:
       x: 0.045
       y: 0.030
@@ -75,12 +80,14 @@ electronics:
       z: 0.235
   wire_harness:
     mass_kg: 0.060
+    mount_frame: waist
     placement_m:
       x: 0.020
       y: 0.000
       z: 0.215
   connectors:
     mass_kg: 0.025
+    mount_frame: rear
     placement_m:
       x: 0.000
       y: 0.000

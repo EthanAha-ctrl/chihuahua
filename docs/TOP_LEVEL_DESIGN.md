@@ -201,11 +201,11 @@ battery 放在哪里 COM 最合理？
 
 这一阶段应该允许粗略 geometry placeholders，但 mass、COM 和 torque 数据必须结构化。
 
-## Stage 2: Single-Link And Subassembly FEM
+## Stage 2: Whole-Robot FEM
 
-以单根杆、单个 bracket、单条腿 link、腰部 bracket 为 base 做 FEM simulation。
+以整只机器人作为唯一 FEM 分析对象。
 
-不要一上来做 whole robot FEM。先用小部件建立可靠的 load case 和加强策略。
+这一阶段不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 路线。局部区域可以在整机结果中表现为 stress / deformation hot spot，但判断、加强和复验都回到 whole-robot FEM 中完成。
 
 FEM load case 应来自阶段 1 的动力学/静力估计：
 
@@ -218,18 +218,25 @@ side load
 landing / stumble impulse approximation
 worst-case pose
 assembly preload
+actuator / battery lumped mass inertia
+waist yaw / pitch extreme pose
+single-leg lifted support condition
+diagonal support condition
 ```
 
 FEM 要找：
 
 ```text
-thin wall failure
-hole stress concentration
-insert pull-out risk
-shaft seat deformation
-bracket bending
+global body deformation
+body torsion
+waist load path weakness
+hip frame deformation
+joint axis misalignment
+endpoint deflection under load
+support-leg load distribution
+torque reaction load path
+stress hot spots
 layer delamination risk
-torsional weakness
 fatigue-sensitive regions
 ```
 
@@ -245,6 +252,8 @@ print orientation change
 material change
 load path redesign
 standard part substitution
+full-frame stiffness redistribution
+actuator / battery placement change
 ```
 
 每次加强之后必须更新：
@@ -261,18 +270,18 @@ FEM result
 阶段 2 不是一次通过，而是一个循环：
 
 ```text
-FEM weak point
- -> geometry reinforcement
+whole-robot FEM stress / deformation hot spot
+ -> full-model geometry reinforcement
  -> mass update
  -> torque update
  -> COM update
- -> new FEM load case
- -> FEM again
+ -> new whole-robot FEM load case
+ -> whole-robot FEM again
 ```
 
 ## Stage 3: IK And Control Development
 
-当 mass、torque 和主要结构件经过几轮 FEM 后，开始加入 IK 和控制。
+当 mass、torque 和整机结构经过几轮 FEM 后，开始加入 IK 和控制。
 
 早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
 
@@ -294,7 +303,7 @@ fall / overload detection
 
 ```text
 不要生成 torque margin 不足的动作
-不要让 FEM 中的薄弱区域长期处在高载荷
+不要让整机 FEM 中的高风险姿态长期处在高载荷或大变形状态
 不要让脚端轨迹逼近 joint limit
 不要让 body pose 把 COM 推出支撑区域
 ```
@@ -408,7 +417,7 @@ known MuJoCo behavior
 1. update geometry / CAD
 2. compute mass / COM / inertia
 3. compute static and motion torque
-4. run FEM on affected parts
+4. run whole-robot FEM
 5. update reinforcement
 6. update IK / control limits
 7. run MuJoCo
@@ -427,7 +436,7 @@ battery assumptions
 mass table
 COM
 joint torque margins
-FEM weakest points
+whole-robot FEM stress / deformation hot spots
 control limitations
 MuJoCo results
 next design decision
@@ -443,7 +452,7 @@ next design decision
 3. Add link mass and COM calculation.
 4. Add static torque estimation for representative poses.
 5. Add versioned design reports.
-6. Prepare FEM export / load-case generation.
+6. Prepare whole-robot FEM export / load-case generation.
 7. Later add IK and MuJoCo export.
 ```
 
