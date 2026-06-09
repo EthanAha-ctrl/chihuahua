@@ -284,6 +284,10 @@ whole-robot FEM stress / deformation hot spot
 
 早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
 
+Stage 3 first-light 记录在 `docs/STAGE_3_IK_CONTROL.md`。当前实现先建立
+IK、trajectory primitive、torque margin checker 和几何级 support polygon
+awareness；MuJoCo/contact 仍属于 Stage 4。
+
 核心能力：
 
 ```text

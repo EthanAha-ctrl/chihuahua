@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive pygame Stage 1 mass and torque viewer.
+"""Interactive pygame Stage 1 mass, torque, and Stage 3 command viewer.
 
 No solid body rendering. No FEM. No controller.
 
@@ -14,6 +14,7 @@ electromechanical overlay:
 - live mass / COM / point-mass inertia estimate
 - live free-space inertial torque estimate
 - material density drag bar
+- Stage 3 first-light joint command bars and head-claw reach target
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ except ModuleNotFoundError as exc:
 
 from endpoint_geometry import LEG_ORDER
 import mass_model as stage1
+import stage3_ik_control as stage3
 from dog_description import (
     DEFAULT_DESCRIPTION_PATH,
     DogDescription,
@@ -57,6 +59,14 @@ DOF_KEYS = (
     "neck:yaw",
     "neck:pitch",
     "head:claw",
+)
+LEG_COMMAND_JOINTS = ("hip_ab", "hip_pitch", "knee_bend", "toe_bend")
+BODY_COMMAND_KEYS = ("waist_yaw", "waist_pitch")
+HEAD_COMMAND_KEYS = ("neck_yaw", "neck_pitch", "head_claw")
+JOINT_COMMAND_KEYS = (
+    *BODY_COMMAND_KEYS,
+    *(f"{leg}_{joint}" for leg in LEG_ORDER for joint in LEG_COMMAND_JOINTS),
+    *HEAD_COMMAND_KEYS,
 )
 
 # Dog geometry, link lengths, joint ranges, and source notes live in
@@ -87,6 +97,20 @@ class ViewerState:
     motion_paused: bool = False
     sim_time: float = 0.0
     camera: Camera = field(default_factory=Camera)
+    joint_commands_deg: dict[str, float] = field(default_factory=dict)
+    show_stage3: bool = True
+    stage3_auto_reach: bool = True
+    stage3_target_m: np.ndarray | None = None
+    stage3_target_age_s: float = 0.0
+    stage3_target_error_m: float = 0.0
+    stage3_target_radius_min_m: float = 0.18
+    stage3_target_radius_max_m: float = 0.34
+    stage3_target_period_s: float = 1.4
+    stage3_active_effector: str = ""
+    stage3_active_commands_deg: dict[str, float] = field(default_factory=dict)
+    stage3_effector_errors_m: dict[str, float] = field(default_factory=dict)
+    stage3_arbitration_age_s: float = 0.0
+    stage3_arbitration_period_s: float = 0.75
 
 
 @dataclass(frozen=True)
@@ -152,12 +176,129 @@ class Stage1Telemetry:
     largest_torque: stage1.TorqueRow
 
 
+@dataclass
+class Stage3JointControl:
+    key: str
+    label: str
+    spec_name: str
+    rect: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
+
+
+@dataclass
+class Stage3Overlay:
+    controls: list[Stage3JointControl]
+    active_key: str | None = None
+    panel_rect: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
+    status: str = ""
+
+
+@dataclass(frozen=True)
+class Stage3ReachCandidate:
+    effector: str
+    commands_deg: dict[str, float]
+    error_m: float
+
+
+@dataclass(frozen=True)
+class Stage3ReachScore:
+    effector: str
+    error_m: float
+
+
 def v3(x: float, y: float, z: float = 0.0) -> np.ndarray:
     return np.array([x, y, z], dtype=float)
 
 
+def normalized(vector: np.ndarray) -> np.ndarray:
+    norm = float(np.linalg.norm(vector))
+    if norm < 1e-12:
+        return vector
+    return vector / norm
+
+
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
 def stable_seed(key: str) -> int:
     return sum((i + 1) * ord(ch) for i, ch in enumerate(key))
+
+
+def dof_to_command_key(key: str) -> str:
+    if key == "waist:yaw":
+        return "waist_yaw"
+    if key == "waist:pitch":
+        return "waist_pitch"
+    if key == "neck:yaw":
+        return "neck_yaw"
+    if key == "neck:pitch":
+        return "neck_pitch"
+    if key == "head:claw":
+        return "head_claw"
+    leg_name, joint_name = key.split(":", 1)
+    return f"{leg_name}_{joint_name}"
+
+
+def command_spec_name(command_key: str) -> str:
+    if command_key in BODY_COMMAND_KEYS or command_key in HEAD_COMMAND_KEYS:
+        return command_key
+    for leg_name in LEG_ORDER:
+        prefix = f"{leg_name}_"
+        if command_key.startswith(prefix):
+            return command_key.removeprefix(prefix)
+    raise ValueError(f"unknown joint command key: {command_key}")
+
+
+def command_label(command_key: str) -> str:
+    return command_key.replace("front_", "f_").replace("rear_", "r_")
+
+
+def default_joint_command_deg(description: DogDescription, command_key: str) -> float:
+    spec_name = command_spec_name(command_key)
+    if command_key == "waist_yaw":
+        return 0.0
+    if command_key == "waist_pitch":
+        return 0.0
+    return description.joint_ranges[spec_name].bias_deg
+
+
+def initialize_joint_commands(
+    viewer: ViewerState,
+    description: DogDescription,
+    waist_deg: float | None = None,
+    waist_pitch_deg: float | None = None,
+) -> None:
+    for key in JOINT_COMMAND_KEYS:
+        viewer.joint_commands_deg.setdefault(key, default_joint_command_deg(description, key))
+    if waist_deg is not None:
+        viewer.joint_commands_deg["waist_yaw"] = waist_deg
+    if waist_pitch_deg is not None:
+        viewer.joint_commands_deg["waist_pitch"] = waist_pitch_deg
+    viewer.waist_deg = viewer.joint_commands_deg["waist_yaw"]
+    viewer.waist_pitch_deg = viewer.joint_commands_deg["waist_pitch"]
+
+
+def joint_command_deg(viewer: ViewerState, description: DogDescription, command_key: str) -> float:
+    if command_key not in viewer.joint_commands_deg:
+        viewer.joint_commands_deg[command_key] = default_joint_command_deg(description, command_key)
+    spec = description.joint_ranges[command_spec_name(command_key)]
+    value = clamp_joint_degrees(viewer.joint_commands_deg[command_key], spec)
+    viewer.joint_commands_deg[command_key] = value
+    return value
+
+
+def set_joint_command_deg(
+    viewer: ViewerState,
+    description: DogDescription,
+    command_key: str,
+    value: float,
+) -> None:
+    spec = description.joint_ranges[command_spec_name(command_key)]
+    viewer.joint_commands_deg[command_key] = clamp_joint_degrees(value, spec)
+    if command_key == "waist_yaw":
+        viewer.waist_deg = viewer.joint_commands_deg[command_key]
+    elif command_key == "waist_pitch":
+        viewer.waist_pitch_deg = viewer.joint_commands_deg[command_key]
 
 
 def active_dof_key(viewer: ViewerState) -> str:
@@ -394,18 +535,20 @@ def make_live_stage1_model(
 ) -> stage1.MassModel:
     assumptions = stage1.Stage1Assumptions()
     geometry = stage1.robot_geometry(description)
+    initialize_joint_commands(viewer, description)
+    viewer.waist_deg = joint_command_deg(viewer, description, "waist_yaw")
+    viewer.waist_pitch_deg = joint_command_deg(viewer, description, "waist_pitch")
     pose = stage1.make_body_pose(geometry, description.viewer.body_z_m, viewer.waist_deg, viewer.waist_pitch_deg)
-    ranges = description.joint_ranges
     targets = stage1.leg_endpoint_targets(geometry)
     legs = {
         name: stage1.solve_leg_chain_from_angles(
             description,
             pose,
             name,
-            ranged_joint_angle(viewer, f"{name}:hip_ab", ranges["hip_ab"]),
-            ranged_joint_angle(viewer, f"{name}:hip_pitch", ranges["hip_pitch"]),
-            ranged_joint_angle(viewer, f"{name}:knee_bend", ranges["knee_bend"]),
-            ranged_joint_angle(viewer, f"{name}:toe_bend", ranges["toe_bend"]),
+            math.radians(joint_command_deg(viewer, description, f"{name}_hip_ab")),
+            math.radians(joint_command_deg(viewer, description, f"{name}_hip_pitch")),
+            math.radians(joint_command_deg(viewer, description, f"{name}_knee_bend")),
+            math.radians(joint_command_deg(viewer, description, f"{name}_toe_bend")),
             targets[name],
         )
         for name in LEG_ORDER
@@ -413,9 +556,9 @@ def make_live_stage1_model(
     head = stage1.make_head_chain_from_angles(
         description,
         pose,
-        ranged_joint_angle(viewer, "neck:yaw", ranges["neck_yaw"]),
-        ranged_joint_angle(viewer, "neck:pitch", ranges["neck_pitch"]),
-        ranged_joint_angle(viewer, "head:claw", ranges["head_claw"]),
+        math.radians(joint_command_deg(viewer, description, "neck_yaw")),
+        math.radians(joint_command_deg(viewer, description, "neck_pitch")),
+        math.radians(joint_command_deg(viewer, description, "head_claw")),
     )
     return stage1.build_mass_model_from_chains("viewer_live", description, catalog, assumptions, pose, legs, head, geometry)
 
@@ -475,6 +618,324 @@ def add_stage1_markers(
     com_shadow = v3(float(com[0]), float(com[1]), 0.0)
     add_line(commands, viewer.camera, screen_size, com_shadow, com, (126, 235, 210), 3)
     add_joint(commands, viewer.camera, screen_size, com, 9, (126, 235, 210), scale_radius=False)
+
+
+def random_target_near_com(
+    com: np.ndarray,
+    rng: np.random.Generator,
+    radius_min_m: float,
+    radius_max_m: float,
+) -> np.ndarray:
+    radius_min_m = max(0.0, radius_min_m)
+    radius_max_m = max(radius_min_m + 1e-6, radius_max_m)
+    direction = rng.normal(size=3)
+    direction = normalized(direction)
+    if float(np.linalg.norm(direction)) < 1e-12:
+        direction = v3(1.0, 0.0, 0.0)
+    radius = float(rng.uniform(radius_min_m, radius_max_m))
+    target = com + direction * radius
+    target[2] = max(0.03, min(0.45, float(target[2])))
+    return target
+
+
+def solve_head_reach_commands(
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    target_m: np.ndarray,
+) -> tuple[dict[str, float], float]:
+    claw = description.viewer.head_claw
+    origin = pose.front_mid
+    rel = target_m - origin
+    forward_component = float(np.dot(rel, pose.front_forward))
+    left_component = float(np.dot(rel, pose.front_left))
+    up_component = float(np.dot(rel, pose.front_up))
+    yaw_deg = math.degrees(math.atan2(left_component, forward_component))
+    planar = math.hypot(forward_component, left_component)
+    pitch_deg = math.degrees(math.atan2(up_component, planar))
+
+    yaw_deg = clamp_joint_degrees(yaw_deg, description.joint_ranges["neck_yaw"])
+    pitch_deg = clamp_joint_degrees(pitch_deg, description.joint_ranges["neck_pitch"])
+
+    distance = float(np.linalg.norm(rel))
+    jaw = max(claw.jaw_length_m, 1e-9)
+    desired_projection = clamp((distance - claw.neck_length_m) / jaw, -1.0, 1.0)
+    max_open = max(abs(description.joint_ranges["head_claw"].min_deg), abs(description.joint_ranges["head_claw"].max_deg))
+    min_projection = math.cos(math.radians(max_open))
+    open_rad = math.acos(clamp(desired_projection, min_projection, 1.0))
+    claw_deg = clamp_joint_degrees(math.degrees(open_rad), description.joint_ranges["head_claw"])
+
+    head = stage1.make_head_chain_from_angles(
+        description,
+        pose,
+        math.radians(yaw_deg),
+        math.radians(pitch_deg),
+        math.radians(claw_deg),
+    )
+    grasp_midpoint = 0.5 * (head.upper_tip + head.lower_tip)
+    error_m = float(np.linalg.norm(grasp_midpoint - target_m))
+    return {"neck_yaw": yaw_deg, "neck_pitch": pitch_deg, "head_claw": claw_deg}, error_m
+
+
+def solve_waist_aim_commands(
+    description: DogDescription,
+    target_m: np.ndarray,
+    source_pose: stage1.BodyPose,
+) -> dict[str, float]:
+    rel_yaw = target_m - source_pose.yaw_joint
+    yaw_deg = math.degrees(math.atan2(float(rel_yaw[1]), float(rel_yaw[0])))
+    yaw_deg = clamp_joint_degrees(yaw_deg, description.joint_ranges["waist_yaw"])
+
+    geometry = stage1.robot_geometry(description)
+    yaw_pose = stage1.make_body_pose(geometry, description.viewer.body_z_m, yaw_deg, 0.0)
+    rel_pitch = target_m - yaw_pose.pitch_joint
+    forward_component = float(np.dot(rel_pitch, yaw_pose.front_forward))
+    left_component = float(np.dot(rel_pitch, yaw_pose.front_left))
+    planar = max(0.03, math.hypot(forward_component, left_component))
+    up_component = float(np.dot(rel_pitch, yaw_pose.front_up))
+    pitch_deg = math.degrees(math.atan2(up_component, planar))
+    pitch_deg = clamp_joint_degrees(pitch_deg, description.joint_ranges["waist_pitch"])
+    return {"waist_yaw": yaw_deg, "waist_pitch": pitch_deg}
+
+
+def solve_body_head_reach_commands(
+    description: DogDescription,
+    source_pose: stage1.BodyPose,
+    target_m: np.ndarray,
+) -> tuple[dict[str, float], float]:
+    commands = solve_waist_aim_commands(description, target_m, source_pose)
+    geometry = stage1.robot_geometry(description)
+    aimed_pose = stage1.make_body_pose(
+        geometry,
+        description.viewer.body_z_m,
+        commands["waist_yaw"],
+        commands["waist_pitch"],
+    )
+    head_commands, error_m = solve_head_reach_commands(description, aimed_pose, target_m)
+    commands.update(head_commands)
+    return commands, error_m
+
+
+def current_leg_angles_rad(
+    viewer: ViewerState,
+    description: DogDescription,
+    leg_name: str,
+) -> dict[str, float]:
+    return {
+        joint: math.radians(joint_command_deg(viewer, description, f"{leg_name}_{joint}"))
+        for joint in LEG_COMMAND_JOINTS
+    }
+
+
+def solve_toe_reach_candidate(
+    viewer: ViewerState,
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    leg_name: str,
+    target_m: np.ndarray,
+) -> Stage3ReachCandidate:
+    commands: dict[str, float] = {}
+    solve_pose = pose
+    if leg_name.startswith("front"):
+        waist_commands = solve_waist_aim_commands(description, target_m, pose)
+        geometry = stage1.robot_geometry(description)
+        solve_pose = stage1.make_body_pose(
+            geometry,
+            description.viewer.body_z_m,
+            waist_commands["waist_yaw"],
+            waist_commands["waist_pitch"],
+        )
+        commands.update(waist_commands)
+
+    solution = stage3.solve_leg_ik(
+        description,
+        solve_pose,
+        leg_name,
+        target_m,
+        previous_angles_rad=current_leg_angles_rad(viewer, description, leg_name),
+        tolerance_m=1e-4,
+        max_iterations=24,
+    )
+    commands.update(
+        {
+            f"{leg_name}_{joint}": math.degrees(solution.angles_rad[joint])
+            for joint in LEG_COMMAND_JOINTS
+        }
+    )
+    return Stage3ReachCandidate(
+        effector=f"{leg_name}_toe",
+        commands_deg=commands,
+        error_m=solution.residual_m,
+    )
+
+
+def solve_head_claw_reach_candidate(
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    target_m: np.ndarray,
+) -> Stage3ReachCandidate:
+    commands, error_m = solve_body_head_reach_commands(description, pose, target_m)
+    return Stage3ReachCandidate(
+        effector="head_claw",
+        commands_deg=commands,
+        error_m=error_m,
+    )
+
+
+def score_toe_reach_candidate(
+    viewer: ViewerState,
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    leg_name: str,
+    target_m: np.ndarray,
+) -> Stage3ReachScore:
+    score_pose = pose
+    if leg_name.startswith("front"):
+        waist_commands = solve_waist_aim_commands(description, target_m, pose)
+        geometry = stage1.robot_geometry(description)
+        score_pose = stage1.make_body_pose(
+            geometry,
+            description.viewer.body_z_m,
+            waist_commands["waist_yaw"],
+            waist_commands["waist_pitch"],
+        )
+
+    reach_chain = stage1.solve_leg_chain(description, score_pose, leg_name, target_m)
+    current_angles = current_leg_angles_rad(viewer, description, leg_name)
+    current_chain = stage1.solve_leg_chain_from_angles(
+        description,
+        score_pose,
+        leg_name,
+        current_angles["hip_ab"],
+        current_angles["hip_pitch"],
+        current_angles["knee_bend"],
+        current_angles["toe_bend"],
+        requested_toe_endpoint=target_m,
+    )
+    movement_m = float(np.linalg.norm(current_chain.toe_endpoint - target_m))
+    return Stage3ReachScore(
+        effector=f"{leg_name}_toe",
+        error_m=reach_chain.target_residual_m + 0.25 * movement_m,
+    )
+
+
+def score_head_claw_reach_candidate(
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    target_m: np.ndarray,
+) -> Stage3ReachScore:
+    _commands, error_m = solve_body_head_reach_commands(description, pose, target_m)
+    return Stage3ReachScore(effector="head_claw", error_m=error_m)
+
+
+def solve_reach_candidate_commands(
+    viewer: ViewerState,
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    target_m: np.ndarray,
+    effector: str,
+) -> Stage3ReachCandidate:
+    if effector == "head_claw":
+        return solve_head_claw_reach_candidate(description, pose, target_m)
+    for leg_name in LEG_ORDER:
+        if effector == f"{leg_name}_toe":
+            return solve_toe_reach_candidate(viewer, description, pose, leg_name, target_m)
+    raise ValueError(f"unknown Stage 3 effector: {effector}")
+
+
+def solve_best_reach_candidate(
+    viewer: ViewerState,
+    description: DogDescription,
+    pose: stage1.BodyPose,
+    target_m: np.ndarray,
+) -> Stage3ReachCandidate:
+    scores = [
+        score_toe_reach_candidate(viewer, description, pose, leg_name, target_m)
+        for leg_name in LEG_ORDER
+    ]
+    scores.append(score_head_claw_reach_candidate(description, pose, target_m))
+    viewer.stage3_effector_errors_m = {score.effector: score.error_m for score in scores}
+    best_score = min(scores, key=lambda score: score.error_m)
+    candidate = solve_reach_candidate_commands(viewer, description, pose, target_m, best_score.effector)
+    viewer.stage3_effector_errors_m[candidate.effector] = candidate.error_m
+    return candidate
+
+
+def update_stage3_reach_target(
+    viewer: ViewerState,
+    description: DogDescription,
+    telemetry: Stage1Telemetry,
+    rng: np.random.Generator,
+    dt: float,
+) -> bool:
+    if not viewer.show_stage3 or not viewer.stage3_auto_reach:
+        return False
+    reach_dt = min(max(dt, 0.0), 1.0 / 60.0)
+    target_changed = False
+    if viewer.stage3_target_m is None:
+        viewer.stage3_target_m = random_target_near_com(
+            telemetry.model.com_m,
+            rng,
+            viewer.stage3_target_radius_min_m,
+            viewer.stage3_target_radius_max_m,
+        )
+        viewer.stage3_target_age_s = 0.0
+        target_changed = True
+    elif not viewer.motion_paused:
+        viewer.stage3_target_age_s += reach_dt
+        viewer.stage3_arbitration_age_s += reach_dt
+        if viewer.stage3_target_age_s >= viewer.stage3_target_period_s:
+            viewer.stage3_target_m = random_target_near_com(
+                telemetry.model.com_m,
+                rng,
+                viewer.stage3_target_radius_min_m,
+                viewer.stage3_target_radius_max_m,
+            )
+            viewer.stage3_target_age_s = 0.0
+            target_changed = True
+
+    needs_arbitration = (
+        target_changed
+        or not viewer.stage3_active_commands_deg
+        or viewer.stage3_arbitration_age_s >= viewer.stage3_arbitration_period_s
+    )
+    if needs_arbitration:
+        candidate = solve_best_reach_candidate(viewer, description, telemetry.model.pose, viewer.stage3_target_m)
+        viewer.stage3_active_effector = candidate.effector
+        viewer.stage3_active_commands_deg = dict(candidate.commands_deg)
+        viewer.stage3_target_error_m = candidate.error_m
+        viewer.stage3_arbitration_age_s = 0.0
+
+    for key, value in viewer.stage3_active_commands_deg.items():
+        set_joint_command_deg(viewer, description, key, value)
+    return True
+
+
+def add_stage3_target_markers(
+    commands: list[DrawCommand],
+    viewer: ViewerState,
+    telemetry: Stage1Telemetry,
+    screen_size: tuple[int, int],
+) -> None:
+    if not viewer.show_stage3 or viewer.stage3_target_m is None:
+        return
+    target = viewer.stage3_target_m
+    com = telemetry.model.com_m
+    error_color = (244, 114, 91) if viewer.stage3_target_error_m > 0.06 else (252, 211, 77)
+    add_line(commands, viewer.camera, screen_size, com, target, (86, 100, 116), 2)
+    add_joint(commands, viewer.camera, screen_size, target, 10, error_color, scale_radius=False)
+    effector_point = stage3_effector_point(telemetry.model, viewer.stage3_active_effector)
+    if effector_point is not None:
+        add_line(commands, viewer.camera, screen_size, effector_point, target, (128, 94, 180), 3)
+        add_joint(commands, viewer.camera, screen_size, effector_point, 7, (196, 181, 253), scale_radius=False)
+
+
+def stage3_effector_point(model: stage1.MassModel, effector: str) -> np.ndarray | None:
+    if effector == "head_claw":
+        return 0.5 * (model.head.upper_tip + model.head.lower_tip)
+    for leg_name in LEG_ORDER:
+        if effector == f"{leg_name}_toe":
+            return model.legs[leg_name].toe_endpoint
+    return None
 
 
 def seismic_torque_color(required_torque_nm: float, global_max_torque_nm: float) -> Color:
@@ -701,6 +1162,200 @@ def draw_material_overlay(
     status = overlay.status or "drag density bar"
     status_surface = small_font.render(status, True, (139, 151, 164))
     screen.blit(status_surface, (panel.x + 20, panel.bottom - 38))
+
+
+def build_stage3_overlay() -> Stage3Overlay:
+    controls = [
+        Stage3JointControl(
+            key=key,
+            label=command_label(key),
+            spec_name=command_spec_name(key),
+        )
+        for key in JOINT_COMMAND_KEYS
+    ]
+    return Stage3Overlay(controls=controls)
+
+
+def layout_stage3_overlay(
+    overlay: Stage3Overlay,
+    screen_size: tuple[int, int],
+    occupied_panels: Iterable[pygame.Rect],
+) -> None:
+    width, height = screen_size
+    panel_width = min(660, max(500, width - 32))
+    panel_x = max(16, width - panel_width - 20)
+    panel_y = 20
+    for panel in occupied_panels:
+        if panel.width > 0 and panel.height > 0:
+            panel_y = max(panel_y, panel.bottom + 18)
+
+    header_height = 98
+    footer_height = 54
+    available_height = max(260, height - panel_y - 20)
+    row_step = max(18, min(24, int((available_height - header_height - footer_height) / max(1, len(overlay.controls)))))
+    y = panel_y + header_height
+    slider_left = panel_x + min(350, panel_width - 240)
+    for control in overlay.controls:
+        control.rect = pygame.Rect(slider_left, y + 7, panel_x + panel_width - slider_left - 34, 10)
+        y += row_step
+
+    panel_height = max(260, min(height - panel_y - 20, y - panel_y + footer_height))
+    overlay.panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+
+
+def stage3_slider_value_from_x(control: Stage3JointControl, description: DogDescription, mouse_x: int) -> float:
+    spec = description.joint_ranges[control.spec_name]
+    if control.rect.width <= 0 or abs(spec.max_deg - spec.min_deg) < 1e-12:
+        return spec.min_deg
+    t = (mouse_x - control.rect.left) / control.rect.width
+    t = max(0.0, min(1.0, t))
+    return spec.min_deg + t * (spec.max_deg - spec.min_deg)
+
+
+def stage3_slider_x_from_value(
+    control: Stage3JointControl,
+    description: DogDescription,
+    viewer: ViewerState,
+) -> int:
+    spec = description.joint_ranges[control.spec_name]
+    value = joint_command_deg(viewer, description, control.key)
+    if abs(spec.max_deg - spec.min_deg) < 1e-12:
+        return control.rect.left
+    t = (value - spec.min_deg) / (spec.max_deg - spec.min_deg)
+    t = max(0.0, min(1.0, t))
+    return int(control.rect.left + t * control.rect.width)
+
+
+def command_reaches_active_effector(command_key: str, effector: str) -> bool:
+    if effector == "head_claw":
+        return command_key in {*BODY_COMMAND_KEYS, *HEAD_COMMAND_KEYS}
+    for leg_name in LEG_ORDER:
+        if effector == f"{leg_name}_toe":
+            if command_key.startswith(f"{leg_name}_"):
+                return True
+            return leg_name.startswith("front") and command_key in BODY_COMMAND_KEYS
+    return False
+
+
+def handle_stage3_overlay_event(
+    event: pygame.event.Event,
+    viewer: ViewerState,
+    overlay: Stage3Overlay,
+    description: DogDescription,
+) -> bool:
+    if not viewer.show_stage3:
+        return False
+
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if not overlay.panel_rect.collidepoint(event.pos):
+            return False
+        for control in overlay.controls:
+            if control.rect.inflate(0, 16).collidepoint(event.pos):
+                overlay.active_key = control.key
+                viewer.stage3_auto_reach = False
+                viewer.joint_babble = False
+                viewer.waist_babble = False
+                set_joint_command_deg(
+                    viewer,
+                    description,
+                    control.key,
+                    stage3_slider_value_from_x(control, description, event.pos[0]),
+                )
+                overlay.status = f"manual {control.label}"
+                return True
+        return True
+
+    if event.type == pygame.MOUSEMOTION and overlay.active_key is not None:
+        control = next((item for item in overlay.controls if item.key == overlay.active_key), None)
+        if control is None:
+            overlay.active_key = None
+            return False
+        set_joint_command_deg(
+            viewer,
+            description,
+            control.key,
+            stage3_slider_value_from_x(control, description, event.pos[0]),
+        )
+        overlay.status = f"manual {control.label}"
+        return True
+
+    if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and overlay.active_key is not None:
+        overlay.active_key = None
+        return True
+
+    return False
+
+
+def draw_stage3_overlay(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    small_font: pygame.font.Font,
+    viewer: ViewerState,
+    overlay: Stage3Overlay,
+    description: DogDescription,
+    telemetry: Stage1Telemetry,
+) -> None:
+    if not viewer.show_stage3:
+        return
+
+    panel = overlay.panel_rect
+    pygame.draw.rect(screen, (17, 21, 27), panel, border_radius=8)
+    pygame.draw.rect(screen, (80, 91, 105), panel, width=1, border_radius=8)
+
+    title = font.render("stage 3 command bars", True, (238, 241, 245))
+    screen.blit(title, (panel.x + 20, panel.y + 18))
+    mode = "auto best-effector reach" if viewer.stage3_auto_reach else "manual joints"
+    radius_line = f"{mode} | target r {viewer.stage3_target_radius_min_m:.2f}..{viewer.stage3_target_radius_max_m:.2f} m"
+    screen.blit(small_font.render(radius_line, True, (190, 201, 214)), (panel.x + 20, panel.y + 52))
+    screen.blit(small_font.render("no gravity/contact", True, (155, 169, 186)), (panel.x + 20, panel.y + 72))
+
+    for control in overlay.controls:
+        spec = description.joint_ranges[control.spec_name]
+        value = joint_command_deg(viewer, description, control.key)
+        active = overlay.active_key == control.key
+        selected = command_reaches_active_effector(control.key, viewer.stage3_active_effector)
+        label_color = (232, 240, 249) if control.key in HEAD_COMMAND_KEYS else (181, 193, 207)
+        if selected:
+            label_color = (167, 243, 208)
+        if active:
+            label_color = (255, 223, 128)
+        label = small_font.render(f"{control.label:<18} {value:7.2f}", True, label_color)
+        screen.blit(label, (panel.x + 22, control.rect.y - 10))
+
+        pygame.draw.rect(screen, (48, 56, 67), control.rect, border_radius=4)
+        zero_x = control.rect.left
+        if spec.min_deg < 0.0 < spec.max_deg:
+            zero_t = (0.0 - spec.min_deg) / (spec.max_deg - spec.min_deg)
+            zero_x = int(control.rect.left + zero_t * control.rect.width)
+            pygame.draw.line(
+                screen,
+                (113, 128, 145),
+                (zero_x, control.rect.top - 4),
+                (zero_x, control.rect.bottom + 4),
+                1,
+            )
+        knob_x = stage3_slider_x_from_value(control, description, viewer)
+        fill_left = min(zero_x, knob_x)
+        fill_width = max(2, abs(knob_x - zero_x))
+        bar_color = (124, 93, 196) if control.key in HEAD_COMMAND_KEYS else (70, 125, 156)
+        if selected:
+            bar_color = (52, 180, 135)
+        pygame.draw.rect(
+            screen,
+            bar_color,
+            pygame.Rect(fill_left, control.rect.top, fill_width, control.rect.height),
+            border_radius=4,
+        )
+        knob_color = (255, 217, 120) if active else (181, 219, 246)
+        pygame.draw.circle(screen, knob_color, (knob_x, control.rect.centery), 8)
+
+    target_status = "target pending"
+    if viewer.stage3_target_m is not None:
+        winner = viewer.stage3_active_effector or "none"
+        target_status = f"winner {winner} | reach residual {viewer.stage3_target_error_m:.3f} m"
+    status = overlay.status or target_status
+    status_color = (252, 211, 77) if viewer.stage3_auto_reach else (155, 169, 186)
+    screen.blit(small_font.render(status, True, status_color), (panel.x + 20, panel.bottom - 42))
 
 
 def add_scalar_tuning_control(
@@ -1043,7 +1698,7 @@ def draw_text_panel(
             f"max XY target reach {metrics['max_reach_xy']:.3f} m | target residual {metrics['max_target_residual_m']:.3f} m "
             f"| toe z {metrics['min_toe_z']:.3f}..{metrics['max_toe_z']:.3f} m"
         ),
-        "rough placeholders | no CAD mass, no FEM, no controller",
+        "rough placeholders | no CAD mass, no FEM, no gravity/contact",
     ]
     if viewer.dof_solo:
         lines.append(f"DOF solo {viewer.dof_index % len(DOF_KEYS) + 1:02d}/{len(DOF_KEYS)} | {active_dof_key(viewer)}")
@@ -1061,6 +1716,7 @@ def draw_text_panel(
             "space: freeze motion",
             "M: 21-DOF solo    N: next solo DOF",
             "B: joint babble    ,/.: babble amplitude",
+            "G: stage 3 command bars    R: random best-effector reach auto/manual",
             "left-drag mouse: orbit camera    wheel: zoom",
             "Y: material/torque overlay    T: geometry tuning overlay",
             "P: screenshot    ?: help    Esc: quit",
@@ -1078,11 +1734,27 @@ def clamp_joint_degrees(value: float, spec: JointRange) -> float:
 def update_autoplay(viewer: ViewerState, description: DogDescription) -> None:
     if viewer.motion_paused:
         return
+    initialize_joint_commands(viewer, description)
     if viewer.waist_babble or viewer.dof_solo:
-        viewer.waist_deg = math.degrees(ranged_joint_angle(viewer, "waist:yaw", description.joint_ranges["waist_yaw"]))
-        viewer.waist_pitch_deg = math.degrees(
-            ranged_joint_angle(viewer, "waist:pitch", description.joint_ranges["waist_pitch"])
-        )
+        for key in ("waist:yaw", "waist:pitch"):
+            command_key = dof_to_command_key(key)
+            set_joint_command_deg(
+                viewer,
+                description,
+                command_key,
+                math.degrees(ranged_joint_angle(viewer, key, description.joint_ranges[command_spec_name(command_key)])),
+            )
+    if viewer.joint_babble or viewer.dof_solo:
+        for key in DOF_KEYS:
+            if key.startswith("waist:"):
+                continue
+            command_key = dof_to_command_key(key)
+            set_joint_command_deg(
+                viewer,
+                description,
+                command_key,
+                math.degrees(ranged_joint_angle(viewer, key, description.joint_ranges[command_spec_name(command_key)])),
+            )
 
 
 def handle_key(event: pygame.event.Event, viewer: ViewerState, description: DogDescription) -> bool:
@@ -1093,15 +1765,19 @@ def handle_key(event: pygame.event.Event, viewer: ViewerState, description: DogD
     if event.key in (pygame.K_LEFT, pygame.K_a):
         viewer.waist_babble = False
         viewer.waist_deg = clamp_joint_degrees(viewer.waist_deg - 2.0, yaw_spec)
+        set_joint_command_deg(viewer, description, "waist_yaw", viewer.waist_deg)
     elif event.key in (pygame.K_RIGHT, pygame.K_d):
         viewer.waist_babble = False
         viewer.waist_deg = clamp_joint_degrees(viewer.waist_deg + 2.0, yaw_spec)
+        set_joint_command_deg(viewer, description, "waist_yaw", viewer.waist_deg)
     elif event.key in (pygame.K_UP, pygame.K_w):
         viewer.waist_babble = False
         viewer.waist_pitch_deg = clamp_joint_degrees(viewer.waist_pitch_deg + 2.0, pitch_spec)
+        set_joint_command_deg(viewer, description, "waist_pitch", viewer.waist_pitch_deg)
     elif event.key in (pygame.K_DOWN, pygame.K_s):
         viewer.waist_babble = False
         viewer.waist_pitch_deg = clamp_joint_degrees(viewer.waist_pitch_deg - 2.0, pitch_spec)
+        set_joint_command_deg(viewer, description, "waist_pitch", viewer.waist_pitch_deg)
     elif event.key == pygame.K_SPACE:
         viewer.motion_paused = not viewer.motion_paused
     elif event.key == pygame.K_b:
@@ -1117,6 +1793,16 @@ def handle_key(event: pygame.event.Event, viewer: ViewerState, description: DogD
         viewer.show_tuning = not viewer.show_tuning
     elif event.key == pygame.K_y:
         viewer.show_materials = not viewer.show_materials
+    elif event.key == pygame.K_g:
+        viewer.show_stage3 = not viewer.show_stage3
+    elif event.key == pygame.K_r:
+        viewer.stage3_auto_reach = not viewer.stage3_auto_reach
+        if viewer.stage3_auto_reach:
+            viewer.stage3_target_m = None
+            viewer.stage3_active_effector = ""
+            viewer.stage3_active_commands_deg = {}
+            viewer.stage3_effector_errors_m = {}
+            viewer.stage3_arbitration_age_s = 0.0
     elif event.key == pygame.K_COMMA:
         viewer.babble_scale = max(0.0, viewer.babble_scale - 0.10)
     elif event.key == pygame.K_PERIOD:
@@ -1147,6 +1833,7 @@ def run_viewer(args: argparse.Namespace) -> None:
     base_catalog = stage1.load_catalog(args.materials, args.actuators, args.batteries)
     tuning_overlay = build_tuning_overlay(description)
     material_overlay = build_material_overlay(base_catalog)
+    stage3_overlay = build_stage3_overlay()
     viewer = ViewerState(
         waist_deg=args.waist,
         waist_pitch_deg=args.waist_pitch,
@@ -1156,7 +1843,15 @@ def run_viewer(args: argparse.Namespace) -> None:
         dof_index=args.dof_index % len(DOF_KEYS),
         babble_scale=args.babble_scale,
         motion_paused=args.paused,
+        show_stage3=not args.no_stage3_overlay,
+        stage3_auto_reach=not args.no_stage3_reach,
+        stage3_target_radius_min_m=args.stage3_target_radius_min_m,
+        stage3_target_radius_max_m=args.stage3_target_radius_max_m,
+        stage3_target_period_s=args.stage3_target_period_s,
+        stage3_arbitration_period_s=args.stage3_arbitration_period_s,
     )
+    initialize_joint_commands(viewer, description, args.waist, args.waist_pitch)
+    rng = np.random.default_rng(args.stage3_seed)
     dragging = False
     last_mouse = (0, 0)
     running = True
@@ -1164,7 +1859,7 @@ def run_viewer(args: argparse.Namespace) -> None:
     screenshot_path = args.screenshot
 
     while running:
-        dt = clock.tick(60) / 1000.0
+        dt = clock.tick(args.fps) / 1000.0
         if not viewer.motion_paused:
             viewer.sim_time += dt
         layout_tuning_overlay(tuning_overlay, screen.get_size())
@@ -1173,6 +1868,12 @@ def run_viewer(args: argparse.Namespace) -> None:
             screen.get_size(),
             tuning_overlay.panel_rect if viewer.show_tuning else None,
         )
+        occupied = []
+        if viewer.show_tuning:
+            occupied.append(tuning_overlay.panel_rect)
+        if viewer.show_materials:
+            occupied.append(material_overlay.panel_rect)
+        layout_stage3_overlay(stage3_overlay, screen.get_size(), occupied)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -1187,6 +1888,8 @@ def run_viewer(args: argparse.Namespace) -> None:
                     continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
+                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
+                    continue
                 if event.button == 1:
                     dragging = True
                     last_mouse = event.pos
@@ -1199,11 +1902,15 @@ def run_viewer(args: argparse.Namespace) -> None:
                     continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
+                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
+                    continue
                 dragging = False
             elif event.type == pygame.MOUSEMOTION and dragging:
                 if handle_material_overlay_event(event, viewer, material_overlay):
                     continue
                 if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
+                    continue
+                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
                     continue
                 dx = event.pos[0] - last_mouse[0]
                 dy = event.pos[1] - last_mouse[1]
@@ -1213,22 +1920,25 @@ def run_viewer(args: argparse.Namespace) -> None:
             elif event.type == pygame.MOUSEMOTION:
                 handle_material_overlay_event(event, viewer, material_overlay)
                 handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config)
+                handle_stage3_overlay_event(event, viewer, stage3_overlay, description)
 
         update_autoplay(viewer, description)
-        viewer.waist_deg = clamp_joint_degrees(viewer.waist_deg, description.joint_ranges["waist_yaw"])
-        viewer.waist_pitch_deg = clamp_joint_degrees(
-            viewer.waist_pitch_deg, description.joint_ranges["waist_pitch"]
-        )
+        set_joint_command_deg(viewer, description, "waist_yaw", joint_command_deg(viewer, description, "waist_yaw"))
+        set_joint_command_deg(viewer, description, "waist_pitch", joint_command_deg(viewer, description, "waist_pitch"))
 
         screen.fill((12, 15, 19))
         live_catalog = live_catalog_with_material_overlay(base_catalog, material_overlay)
         telemetry = make_stage1_telemetry(description, viewer, live_catalog)
+        if update_stage3_reach_target(viewer, description, telemetry, rng, dt):
+            telemetry = make_stage1_telemetry(description, viewer, live_catalog)
         commands, metrics = make_scene_commands(viewer, telemetry, screen.get_size())
         add_stage1_markers(commands, viewer, telemetry, screen.get_size())
+        add_stage3_target_markers(commands, viewer, telemetry, screen.get_size())
         render_commands(screen, commands)
         draw_text_panel(screen, font, small_font, viewer, metrics, telemetry, clock.get_fps())
         draw_tuning_overlay(screen, font, small_font, viewer, tuning_overlay, description)
         draw_material_overlay(screen, font, small_font, viewer, material_overlay, telemetry)
+        draw_stage3_overlay(screen, font, small_font, viewer, stage3_overlay, description, telemetry)
         pygame.display.flip()
 
         if screenshot_path is not None:
@@ -1253,6 +1963,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dof-solo", action="store_true", help="animate one of the 21 DOFs at a time")
     parser.add_argument("--dof-index", type=int, default=0, help="zero-based DOF index for --dof-solo")
     parser.add_argument("--babble-scale", type=float, default=1.0, help="scale for joint oscillation")
+    parser.add_argument("--no-stage3-overlay", action="store_true", help="hide Stage 3 joint command bars")
+    parser.add_argument("--no-stage3-reach", action="store_true", help="disable random head-claw target reach")
+    parser.add_argument("--stage3-target-radius-min-m", type=float, default=0.18)
+    parser.add_argument("--stage3-target-radius-max-m", type=float, default=0.34)
+    parser.add_argument("--stage3-target-period-s", type=float, default=1.4)
+    parser.add_argument("--stage3-arbitration-period-s", type=float, default=0.30)
+    parser.add_argument("--stage3-seed", type=int, default=7, help="random seed for Stage 3 head-claw reach targets")
+    parser.add_argument("--fps", type=int, default=30, help="viewer frame-rate cap")
     parser.add_argument("--headless", action="store_true", help="run with SDL dummy video driver")
     parser.add_argument("--frames", type=int, default=3, help="frames to render in headless mode")
     parser.add_argument("--screenshot", type=Path, default=None, help="save one screenshot and keep running unless headless")
