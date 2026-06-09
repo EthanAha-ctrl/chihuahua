@@ -56,3 +56,16 @@ fem/stage2/<design_version>/<load_case>/
 ```
 
 These paths describe expected artifacts, not local tool installation paths.
+
+## Stage 4 MuJoCo / Contact
+
+### MuJoCo Python
+
+- status: optional for first-light, required for real Stage 4 simulation
+- role: load and run the exported MuJoCo XML model
+- project stage: Stage 4
+- source: official MuJoCo Python package
+- expected inputs: `mujoco_model.xml`
+- expected outputs: simulation state/contact history and failure observations
+- repo policy: Stage 4 XML and contact CSV export must work without vendoring or requiring the solver package
+- first-light reproduction: `docs/STAGE_4_MUJOCO_CONTACT.md`

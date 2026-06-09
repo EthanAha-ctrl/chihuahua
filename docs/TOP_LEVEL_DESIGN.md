@@ -326,6 +326,10 @@ simulation-ready actuator commands
 
 把经过阶段 1-3 迭代的 CAD / rigid body / control 放进 MuJoCo。
 
+Stage 4 first-light 记录在 `docs/STAGE_4_MUJOCO_CONTACT.md`。当前实现先建立
+MuJoCo XML export、foot contact geometry、准静态支撑反力 proxy 和
+Stage 2 feedback load-case table；闭环 balance 和真实动态步态仍是后续工作。
+
 MuJoCo 模型需要包含：
 
 ```text
