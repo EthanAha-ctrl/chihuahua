@@ -25,6 +25,8 @@ return to dock
 
 ---
 
+https://chiwuawua.com/
+
 `SURVIVAL_TO_DESIGN_GOALS.md` 很关键, 它把工程拉到“恢复一个智能动物继续生活的能力”。
  **return-to-wild / return-to-hunt prosthetic animal architecture** 是 know-how。
 它是一个 living agent, 目标是:
