@@ -4,7 +4,7 @@
 
 构建一只能够由 Bambu 系列 FDM 打印机制造主要结构件的机械四肢动物。
 
-目标不是先打印一个看起来像狗的外壳，而是建立一个可以收敛的机电设计流程：
+目标是建立一个可以收敛的机电设计流程：
 
 ```text
 geometry
@@ -28,7 +28,7 @@ mass shifts COM
 COM changes torque and control
 ```
 
-因此每个阶段都必须更新质量、重心、惯量、力矩裕度和结构强度，而不是只看静态几何。
+每个阶段都更新质量、重心、惯量、力矩裕度和结构强度。
 
 ## 当前仓库角色
 
@@ -105,7 +105,7 @@ voltage
 driver mass
 ```
 
-actuator 不是只提供 torque，它本身也是 mass，并且通常在离 COM 很远的位置。actuator placement 会直接改变 torque requirement。
+actuator 提供 torque，它本身也是 mass，并且通常在离 COM 很远的位置。actuator placement 会直接改变 torque requirement。
 
 ### Battery And Electronics Model
 
@@ -160,7 +160,7 @@ print orientation
 post-processing assumptions
 ```
 
-这不是阶段 5 才考虑的东西。打印方向会影响强度，因此它必须参与 FEM 和 CAD 迭代。
+打印方向会影响强度，它参与 FEM 和 CAD 迭代。
 
 ## Stage 1: Free-Motion Mass And Torque Body
 
@@ -267,7 +267,7 @@ battery estimate if needed
 FEM result
 ```
 
-阶段 2 不是一次通过，而是一个循环：
+阶段 2 是一个循环：
 
 ```text
 whole-robot FEM stress / deformation hot spot
@@ -434,7 +434,7 @@ updated control limits
 只有当 mass、torque、FEM、IK、MuJoCo 和复杂地形 IK 都达到最低可信度之后，
 才开始完整打印实施。
 
-打印实施不是探索主设计，而是验证制造和装配：
+打印实施验证制造和装配：
 
 ```text
 print orientation
@@ -478,7 +478,7 @@ known complex terrain IK behavior
 
 ## Development Loop
 
-真实开发不是线性的。主循环应该是：
+主循环应该是：
 
 ```text
 1. update geometry / CAD
@@ -550,7 +550,7 @@ geometry + mass + torque + strength + control + simulation
 
 ## Design Philosophy
 
-这个项目的重点不是快速打印一个玩具，而是建立一个能够让机械四肢动物收敛的设计系统。
+这个项目的重点是建立一个能够让机械四肢动物收敛的设计系统。
 
 最重要的约束是：
 
