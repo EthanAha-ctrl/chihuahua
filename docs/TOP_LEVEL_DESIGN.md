@@ -207,21 +207,20 @@ battery 放在哪里 COM 最合理？
 
 这一阶段不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 路线。局部区域可以在整机结果中表现为 stress / deformation hot spot，但判断、加强和复验都回到 whole-robot FEM 中完成。
 
-FEM load case 应来自阶段 1 的动力学/静力估计：
+Stage 2 FEM load case 应来自阶段 1 的质量、惯量、姿态和 joint torque
+估计，但这一阶段不引入 gravity、ground contact、support reaction 或
+fixed feet。重力、接触和支撑稳定性属于后续 MuJoCo/contact 阶段；MuJoCo
+结果再回灌 Stage 2，生成新的无重力结构复验工况。
 
 ```text
-gravity load
 max joint torque
 continuous joint torque
-foot contact reaction
-side load
-landing / stumble impulse approximation
 worst-case pose
-assembly preload
 actuator / battery lumped mass inertia
 waist yaw / pitch extreme pose
-single-leg lifted support condition
-diagonal support condition
+torque replay articulated bend
+motion-slice inertial load from Stage 1
+mesh / material / radius comparison under the same torque replay
 ```
 
 FEM 要找：
@@ -233,7 +232,7 @@ waist load path weakness
 hip frame deformation
 joint axis misalignment
 endpoint deflection under load
-support-leg load distribution
+whole-body torque / inertia load distribution
 torque reaction load path
 stress hot spots
 layer delamination risk

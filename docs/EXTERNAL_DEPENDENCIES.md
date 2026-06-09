@@ -18,6 +18,7 @@
 - expected inputs: whole-robot OpenRadioss case files
 - expected outputs: animation / time-history result files
 - repo policy: do not vendor solver binaries into this repository
+- first-light reproduction: `docs/STAGE_2_OPENRADIOSS_FIRST_LIGHT.md`
 
 ### OpenRadioss Result Conversion
 
