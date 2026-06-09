@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
+import yaml
 
 import view_mujoco
 
@@ -91,6 +92,14 @@ class ViewMujocoLauncherTest(unittest.TestCase):
         self.assertIn("ground", contact_geom_names)
         self.assertTrue(self.FOOT_CONTACT_NAMES.issubset(contact_geom_names))
         self.assertFalse(any(name and "foot_anchor" in name for name in contact_geom_names))
+
+    def test_default_launcher_case_reports_data_topology_tree(self):
+        case = view_mujoco.build_default_case()
+        with case.summary_path.open(encoding="utf-8") as handle:
+            summary = yaml.safe_load(handle)
+
+        self.assertTrue(summary["analysis_state"]["viewer_safe_uses_data_topology_tree"])
+        self.assertEqual(summary["counts"]["viewer_safe_topology_bodies"], 23)
 
     def test_default_launcher_case_structure_geoms_collide_with_ground(self):
         case = view_mujoco.build_default_case()

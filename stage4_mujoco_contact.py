@@ -118,6 +118,35 @@ class Stage4Case:
     smoke_result: MujocoSmokeResult
 
 
+@dataclass(frozen=True)
+class MujocoGeomSpec:
+    name: str
+    geom_type: str
+    size: str
+    material: str
+    pos_m: np.ndarray | None = None
+    fromto_m: tuple[float, ...] | None = None
+    friction: str | None = None
+    contype: str = "1"
+    conaffinity: str = "1"
+
+
+@dataclass(frozen=True)
+class MujocoBodySpec:
+    name: str
+    pos_m: np.ndarray
+    inertial_body_name: str | None = None
+    joints: tuple[Stage4HingeExport, ...] = ()
+    geoms: tuple[MujocoGeomSpec, ...] = ()
+    children: tuple["MujocoBodySpec", ...] = ()
+
+
+@dataclass(frozen=True)
+class MujocoTopologySpec:
+    root_geoms: tuple[MujocoGeomSpec, ...]
+    root_children: tuple[MujocoBodySpec, ...]
+
+
 def fmt(value: float | None) -> str:
     if value is None:
         return ""
@@ -553,6 +582,69 @@ def add_body_inertial(
     add_mass_element_inertial(body, mass_assignments.get(body_name, ()), body_origins[body_name])
 
 
+def geom_xml_attributes(spec: MujocoGeomSpec) -> dict[str, str]:
+    attrs = {
+        "name": spec.name,
+        "type": spec.geom_type,
+        "size": spec.size,
+        "material": spec.material,
+        "contype": spec.contype,
+        "conaffinity": spec.conaffinity,
+    }
+    if spec.pos_m is not None:
+        attrs["pos"] = xml_vec(spec.pos_m)
+    if spec.fromto_m is not None:
+        attrs["fromto"] = xml_vec(spec.fromto_m)
+    if spec.friction is not None:
+        attrs["friction"] = spec.friction
+    return attrs
+
+
+def emit_mujoco_geom_specs(parent: ET.Element, specs: tuple[MujocoGeomSpec, ...]) -> None:
+    for spec in specs:
+        ET.SubElement(parent, "geom", **geom_xml_attributes(spec))
+
+
+def emit_mujoco_body_spec(
+    parent: ET.Element,
+    spec: MujocoBodySpec,
+    mass_assignments: dict[str, tuple[stage1.MassElement, ...]] | None,
+    body_origins: dict[str, np.ndarray] | None,
+) -> tuple[Stage4HingeExport, ...]:
+    body = ET.SubElement(parent, "body", name=spec.name, pos=xml_vec(spec.pos_m))
+    if spec.inertial_body_name is not None:
+        add_body_inertial(body, spec.inertial_body_name, mass_assignments, body_origins)
+
+    hinges: list[Stage4HingeExport] = []
+    for hinge in spec.joints:
+        add_hinge_joint(body, hinge)
+        hinges.append(hinge)
+    emit_mujoco_geom_specs(body, spec.geoms)
+    for child in spec.children:
+        hinges.extend(emit_mujoco_body_spec(body, child, mass_assignments, body_origins))
+    return tuple(hinges)
+
+
+def emit_mujoco_topology_spec(
+    root_body: ET.Element,
+    topology: MujocoTopologySpec,
+    mass_assignments: dict[str, tuple[stage1.MassElement, ...]] | None,
+    body_origins: dict[str, np.ndarray] | None,
+) -> tuple[Stage4HingeExport, ...]:
+    emit_mujoco_geom_specs(root_body, topology.root_geoms)
+    hinges: list[Stage4HingeExport] = []
+    for child in topology.root_children:
+        hinges.extend(emit_mujoco_body_spec(root_body, child, mass_assignments, body_origins))
+    return tuple(hinges)
+
+
+def count_topology_bodies(topology: MujocoTopologySpec) -> int:
+    def count_body(spec: MujocoBodySpec) -> int:
+        return 1 + sum(count_body(child) for child in spec.children)
+
+    return sum(count_body(child) for child in topology.root_children)
+
+
 def add_mujoco_assets(root: ET.Element) -> None:
     asset = ET.SubElement(root, "asset")
     ET.SubElement(asset, "material", name="structure", rgba="0.58 0.63 0.70 1")
@@ -577,31 +669,41 @@ def add_default(root: ET.Element, friction_coeff: float) -> None:
     ET.SubElement(default, "motor", ctrllimited="true")
 
 
-def add_rod_geoms_for_members(
-    root_body: ET.Element,
+def rod_geom_specs_for_members(
     rod_model: rods.RodModel,
     include_member: Any,
     origin_m: np.ndarray | None = None,
-) -> None:
+) -> tuple[MujocoGeomSpec, ...]:
     origin = np.zeros(3) if origin_m is None else np.array(origin_m, dtype=float)
     node_positions = {node.name: node.xyz_m for node in rod_model.nodes}
+    specs: list[MujocoGeomSpec] = []
     for member in rod_model.members:
         if not include_member(member):
             continue
         a = node_positions[member.node_a] - origin
         b = node_positions[member.node_b] - origin
         radius = max(0.0025, float(member.nominal_radius_m))
-        ET.SubElement(
-            root_body,
-            "geom",
-            name=member.name,
-            type="capsule",
-            fromto=xml_vec([*a, *b]),
-            size=xml_float(radius),
-            material="structure",
-            contype="1",
-            conaffinity="1",
+        specs.append(
+            MujocoGeomSpec(
+                name=member.name,
+                geom_type="capsule",
+                fromto_m=tuple(float(value) for value in (*a, *b)),
+                size=xml_float(radius),
+                material="structure",
+                contype="1",
+                conaffinity="1",
+            )
         )
+    return tuple(specs)
+
+
+def add_rod_geoms_for_members(
+    root_body: ET.Element,
+    rod_model: rods.RodModel,
+    include_member: Any,
+    origin_m: np.ndarray | None = None,
+) -> None:
+    emit_mujoco_geom_specs(root_body, rod_geom_specs_for_members(rod_model, include_member, origin_m))
 
 
 def add_rod_geoms(root_body: ET.Element, rod_model: rods.RodModel) -> None:
@@ -610,6 +712,161 @@ def add_rod_geoms(root_body: ET.Element, rod_model: rods.RodModel) -> None:
         rod_model,
         lambda member: member.group not in {"head", "leg", "toe"},
     )
+
+
+def leg_chain_body_specs(
+    model: stage1.MassModel,
+    joint_specs: tuple[Stage4JointSpec, ...],
+    foot_radius_m: float,
+    friction_coeff: float,
+    show_auxiliary_geoms: bool,
+    add_contact_feet: bool,
+    leg_names: Iterable[str] = LEG_ORDER,
+    origin_m: np.ndarray | None = None,
+) -> tuple[MujocoBodySpec, ...]:
+    specs_by_name = {spec.name: spec for spec in joint_specs}
+    origin = np.zeros(3) if origin_m is None else np.array(origin_m, dtype=float)
+    body_specs: list[MujocoBodySpec] = []
+
+    for leg in leg_names:
+        chain = model.legs[leg]
+        forward, outward, _down = model.pose.bases[leg]
+        upper_vec = chain.knee - chain.hip
+        lower_vec = chain.toe_joint - chain.knee
+        toe_vec = chain.toe_endpoint - chain.toe_joint
+
+        hip_ab_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_hip_ab"], axis=forward)
+        hip_pitch_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_hip_pitch"], axis=outward)
+        knee_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_knee_bend"], axis=outward)
+        toe_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_toe_bend"], axis=outward)
+
+        hip_ab_geoms: tuple[MujocoGeomSpec, ...] = ()
+        if show_auxiliary_geoms:
+            hip_ab_geoms = (
+                MujocoGeomSpec(
+                    name=f"{leg}_hip_ab_marker",
+                    geom_type="sphere",
+                    pos_m=np.zeros(3),
+                    size="0.006",
+                    material="joint_stub",
+                    contype="0",
+                    conaffinity="0",
+                ),
+            )
+
+        hip_pitch_geoms = (
+            MujocoGeomSpec(
+                name=f"{leg}_upper_link_live",
+                geom_type="capsule",
+                fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *upper_vec)),
+                size="0.006",
+                material="structure",
+                contype="1",
+                conaffinity="1",
+            ),
+        )
+
+        knee_geoms = [
+            MujocoGeomSpec(
+                name=f"{leg}_lower_link_live",
+                geom_type="capsule",
+                fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *lower_vec)),
+                size="0.0055",
+                material="structure",
+                contype="1",
+                conaffinity="1",
+            )
+        ]
+        if show_auxiliary_geoms:
+            knee_geoms.insert(
+                0,
+                MujocoGeomSpec(
+                    name=f"{leg}_knee_marker",
+                    geom_type="sphere",
+                    pos_m=np.zeros(3),
+                    size="0.006",
+                    material="joint_stub",
+                    contype="0",
+                    conaffinity="0",
+                ),
+            )
+
+        toe_geoms = [
+            MujocoGeomSpec(
+                name=f"{leg}_toe_link_live",
+                geom_type="capsule",
+                fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *toe_vec)),
+                size="0.0045",
+                material="structure",
+                contype="1",
+                conaffinity="1",
+            )
+        ]
+        if show_auxiliary_geoms:
+            toe_geoms.insert(
+                0,
+                MujocoGeomSpec(
+                    name=f"{leg}_toe_joint_marker",
+                    geom_type="sphere",
+                    pos_m=np.zeros(3),
+                    size="0.0055",
+                    material="joint_stub",
+                    contype="0",
+                    conaffinity="0",
+                ),
+            )
+        if add_contact_feet:
+            toe_geoms.append(
+                MujocoGeomSpec(
+                    name=f"{leg}_foot_contact",
+                    geom_type="sphere",
+                    pos_m=np.array(toe_vec, dtype=float),
+                    size=xml_float(foot_radius_m),
+                    material="foot",
+                    friction=f"{friction_coeff:.6g} 0.02 0.001",
+                    contype="1",
+                    conaffinity="1",
+                )
+            )
+
+        body_specs.append(
+            MujocoBodySpec(
+                name=f"{leg}_hip_ab_body",
+                pos_m=np.array(chain.hip - origin, dtype=float),
+                inertial_body_name=f"{leg}_hip_ab_body",
+                joints=(hip_ab_hinge,),
+                geoms=hip_ab_geoms,
+                children=(
+                    MujocoBodySpec(
+                        name=f"{leg}_hip_pitch_body",
+                        pos_m=np.zeros(3),
+                        inertial_body_name=f"{leg}_hip_pitch_body",
+                        joints=(hip_pitch_hinge,),
+                        geoms=hip_pitch_geoms,
+                        children=(
+                            MujocoBodySpec(
+                                name=f"{leg}_knee_body",
+                                pos_m=np.array(upper_vec, dtype=float),
+                                inertial_body_name=f"{leg}_knee_body",
+                                joints=(knee_hinge,),
+                                geoms=tuple(knee_geoms),
+                                children=(
+                                    MujocoBodySpec(
+                                        name=f"{leg}_toe_body",
+                                        pos_m=np.array(lower_vec, dtype=float),
+                                        inertial_body_name=f"{leg}_toe_body",
+                                        joints=(toe_hinge,),
+                                        geoms=tuple(toe_geoms),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )
+
+    return tuple(body_specs)
 
 
 def add_articulated_leg_chains(
@@ -625,134 +882,27 @@ def add_articulated_leg_chains(
     mass_assignments: dict[str, tuple[stage1.MassElement, ...]] | None = None,
     body_origins: dict[str, np.ndarray] | None = None,
 ) -> tuple[Stage4HingeExport, ...]:
-    specs_by_name = {spec.name: spec for spec in joint_specs}
-    origin = np.zeros(3) if origin_m is None else np.array(origin_m, dtype=float)
-    hinges: list[Stage4HingeExport] = []
-
-    for leg in leg_names:
-        chain = model.legs[leg]
-        forward, outward, _down = model.pose.bases[leg]
-        upper_vec = chain.knee - chain.hip
-        lower_vec = chain.toe_joint - chain.knee
-        toe_vec = chain.toe_endpoint - chain.toe_joint
-
-        hip_ab_body = ET.SubElement(root_body, "body", name=f"{leg}_hip_ab_body", pos=xml_vec(chain.hip - origin))
-        add_body_inertial(hip_ab_body, f"{leg}_hip_ab_body", mass_assignments, body_origins)
-        hip_ab_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_hip_ab"], axis=forward)
-        add_hinge_joint(hip_ab_body, hip_ab_hinge)
-        hinges.append(hip_ab_hinge)
-
-        hip_pitch_body = ET.SubElement(hip_ab_body, "body", name=f"{leg}_hip_pitch_body", pos="0 0 0")
-        add_body_inertial(hip_pitch_body, f"{leg}_hip_pitch_body", mass_assignments, body_origins)
-        hip_pitch_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_hip_pitch"], axis=outward)
-        add_hinge_joint(hip_pitch_body, hip_pitch_hinge)
-        hinges.append(hip_pitch_hinge)
-        if show_auxiliary_geoms:
-            ET.SubElement(
-                hip_ab_body,
-                "geom",
-                name=f"{leg}_hip_ab_marker",
-                type="sphere",
-                pos="0 0 0",
-                size="0.006",
-                material="joint_stub",
-                contype="0",
-                conaffinity="0",
-            )
-        ET.SubElement(
-            hip_pitch_body,
-            "geom",
-            name=f"{leg}_upper_link_live",
-            type="capsule",
-            fromto=xml_vec([0.0, 0.0, 0.0, *upper_vec]),
-            size="0.006",
-            material="structure",
-            contype="1",
-            conaffinity="1",
-        )
-
-        knee_body = ET.SubElement(hip_pitch_body, "body", name=f"{leg}_knee_body", pos=xml_vec(upper_vec))
-        add_body_inertial(knee_body, f"{leg}_knee_body", mass_assignments, body_origins)
-        knee_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_knee_bend"], axis=outward)
-        add_hinge_joint(knee_body, knee_hinge)
-        hinges.append(knee_hinge)
-        if show_auxiliary_geoms:
-            ET.SubElement(
-                knee_body,
-                "geom",
-                name=f"{leg}_knee_marker",
-                type="sphere",
-                pos="0 0 0",
-                size="0.006",
-                material="joint_stub",
-                contype="0",
-                conaffinity="0",
-            )
-        ET.SubElement(
-            knee_body,
-            "geom",
-            name=f"{leg}_lower_link_live",
-            type="capsule",
-            fromto=xml_vec([0.0, 0.0, 0.0, *lower_vec]),
-            size="0.0055",
-            material="structure",
-            contype="1",
-            conaffinity="1",
-        )
-
-        toe_body = ET.SubElement(knee_body, "body", name=f"{leg}_toe_body", pos=xml_vec(lower_vec))
-        add_body_inertial(toe_body, f"{leg}_toe_body", mass_assignments, body_origins)
-        toe_hinge = hinge_export_from_joint(specs_by_name[f"{leg}_toe_bend"], axis=outward)
-        add_hinge_joint(toe_body, toe_hinge)
-        hinges.append(toe_hinge)
-        if show_auxiliary_geoms:
-            ET.SubElement(
-                toe_body,
-                "geom",
-                name=f"{leg}_toe_joint_marker",
-                type="sphere",
-                pos="0 0 0",
-                size="0.0055",
-                material="joint_stub",
-                contype="0",
-                conaffinity="0",
-            )
-        ET.SubElement(
-            toe_body,
-            "geom",
-            name=f"{leg}_toe_link_live",
-            type="capsule",
-            fromto=xml_vec([0.0, 0.0, 0.0, *toe_vec]),
-            size="0.0045",
-            material="structure",
-            contype="1",
-            conaffinity="1",
-        )
-        if add_contact_feet:
-            ET.SubElement(
-                toe_body,
-                "geom",
-                name=f"{leg}_foot_contact",
-                type="sphere",
-                pos=xml_vec(toe_vec),
-                size=xml_float(foot_radius_m),
-                material="foot",
-                friction=f"{friction_coeff:.6g} 0.02 0.001",
-                contype="1",
-                conaffinity="1",
-            )
-
-    return tuple(hinges)
+    topology = MujocoTopologySpec(
+        root_geoms=(),
+        root_children=leg_chain_body_specs(
+            model,
+            joint_specs,
+            foot_radius_m,
+            friction_coeff,
+            show_auxiliary_geoms,
+            add_contact_feet,
+            leg_names,
+            origin_m,
+        ),
+    )
+    return emit_mujoco_topology_spec(root_body, topology, mass_assignments, body_origins)
 
 
-def add_articulated_head_chain(
-    root_body: ET.Element,
+def head_chain_body_specs(
     model: stage1.MassModel,
     joint_specs: tuple[Stage4JointSpec, ...],
     origin_m: np.ndarray | None = None,
-    mass_assignments: dict[str, tuple[stage1.MassElement, ...]] | None = None,
-    body_origins: dict[str, np.ndarray] | None = None,
-) -> tuple[Stage4HingeExport, ...]:
+) -> tuple[MujocoBodySpec, ...]:
     specs_by_name = {spec.name: spec for spec in joint_specs}
     required = {"neck_yaw", "neck_pitch", "head_claw"}
     if not required.issubset(specs_by_name):
@@ -767,91 +917,122 @@ def add_articulated_head_chain(
     upper_jaw = head.upper_tip - head.upper_hinge
     lower_jaw = head.lower_tip - head.lower_hinge
 
-    yaw_body = ET.SubElement(root_body, "body", name="neck_yaw_body", pos=xml_vec(head.neck_origin - origin))
-    add_body_inertial(yaw_body, "neck_yaw_body", mass_assignments, body_origins)
     neck_yaw_hinge = hinge_export_from_joint(specs_by_name["neck_yaw"], axis=pose.front_up)
-    add_hinge_joint(yaw_body, neck_yaw_hinge)
-
-    pitch_body = ET.SubElement(yaw_body, "body", name="neck_pitch_body", pos="0 0 0")
-    add_body_inertial(pitch_body, "neck_pitch_body", mass_assignments, body_origins)
     neck_pitch_hinge = hinge_export_from_joint(specs_by_name["neck_pitch"], axis=pose.front_left)
-    add_hinge_joint(pitch_body, neck_pitch_hinge)
-    ET.SubElement(
-        pitch_body,
-        "geom",
-        name="head_neck_live",
-        type="capsule",
-        fromto=xml_vec([0.0, 0.0, 0.0, *neck_vec]),
-        size="0.0045",
-        material="structure",
-        contype="1",
-        conaffinity="1",
-    )
-
-    hinge_body = ET.SubElement(pitch_body, "body", name="head_hinge_body", pos=xml_vec(neck_vec))
-    add_body_inertial(hinge_body, "head_hinge_body", mass_assignments, body_origins)
-    ET.SubElement(
-        hinge_body,
-        "geom",
-        name="head_upper_hinge_mount_live",
-        type="capsule",
-        fromto=xml_vec([0.0, 0.0, 0.0, *upper_mount]),
-        size="0.003",
-        material="structure",
-        contype="1",
-        conaffinity="1",
-    )
-    ET.SubElement(
-        hinge_body,
-        "geom",
-        name="head_lower_hinge_mount_live",
-        type="capsule",
-        fromto=xml_vec([0.0, 0.0, 0.0, *lower_mount]),
-        size="0.003",
-        material="structure",
-        contype="1",
-        conaffinity="1",
-    )
-
-    upper_body = ET.SubElement(hinge_body, "body", name="head_upper_jaw_body", pos=xml_vec(upper_mount))
-    add_body_inertial(upper_body, "head_upper_jaw_body", mass_assignments, body_origins)
     claw_axis = -pose.front_left
     head_claw_driver = hinge_export_from_joint(specs_by_name["head_claw"], axis=claw_axis)
-    add_hinge_joint(upper_body, head_claw_driver)
-    ET.SubElement(
-        upper_body,
-        "geom",
-        name="head_upper_jaw_live",
-        type="capsule",
-        fromto=xml_vec([0.0, 0.0, 0.0, *upper_jaw]),
-        size="0.004",
-        material="structure",
-        contype="1",
-        conaffinity="1",
-    )
-
-    lower_body = ET.SubElement(hinge_body, "body", name="head_lower_jaw_body", pos=xml_vec(lower_mount))
-    add_body_inertial(lower_body, "head_lower_jaw_body", mass_assignments, body_origins)
     lower_claw_follower = hinge_export_from_joint(
         specs_by_name["head_claw"],
         name="head_claw_lower",
         axis=claw_axis,
         coefficient=-1.0,
     )
-    add_hinge_joint(lower_body, lower_claw_follower)
-    ET.SubElement(
-        lower_body,
-        "geom",
-        name="head_lower_jaw_live",
-        type="capsule",
-        fromto=xml_vec([0.0, 0.0, 0.0, *lower_jaw]),
-        size="0.004",
-        material="structure",
-        contype="1",
-        conaffinity="1",
+
+    return (
+        MujocoBodySpec(
+            name="neck_yaw_body",
+            pos_m=np.array(head.neck_origin - origin, dtype=float),
+            inertial_body_name="neck_yaw_body",
+            joints=(neck_yaw_hinge,),
+            children=(
+                MujocoBodySpec(
+                    name="neck_pitch_body",
+                    pos_m=np.zeros(3),
+                    inertial_body_name="neck_pitch_body",
+                    joints=(neck_pitch_hinge,),
+                    geoms=(
+                        MujocoGeomSpec(
+                            name="head_neck_live",
+                            geom_type="capsule",
+                            fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *neck_vec)),
+                            size="0.0045",
+                            material="structure",
+                            contype="1",
+                            conaffinity="1",
+                        ),
+                    ),
+                    children=(
+                        MujocoBodySpec(
+                            name="head_hinge_body",
+                            pos_m=np.array(neck_vec, dtype=float),
+                            inertial_body_name="head_hinge_body",
+                            geoms=(
+                                MujocoGeomSpec(
+                                    name="head_upper_hinge_mount_live",
+                                    geom_type="capsule",
+                                    fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *upper_mount)),
+                                    size="0.003",
+                                    material="structure",
+                                    contype="1",
+                                    conaffinity="1",
+                                ),
+                                MujocoGeomSpec(
+                                    name="head_lower_hinge_mount_live",
+                                    geom_type="capsule",
+                                    fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *lower_mount)),
+                                    size="0.003",
+                                    material="structure",
+                                    contype="1",
+                                    conaffinity="1",
+                                ),
+                            ),
+                            children=(
+                                MujocoBodySpec(
+                                    name="head_upper_jaw_body",
+                                    pos_m=np.array(upper_mount, dtype=float),
+                                    inertial_body_name="head_upper_jaw_body",
+                                    joints=(head_claw_driver,),
+                                    geoms=(
+                                        MujocoGeomSpec(
+                                            name="head_upper_jaw_live",
+                                            geom_type="capsule",
+                                            fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *upper_jaw)),
+                                            size="0.004",
+                                            material="structure",
+                                            contype="1",
+                                            conaffinity="1",
+                                        ),
+                                    ),
+                                ),
+                                MujocoBodySpec(
+                                    name="head_lower_jaw_body",
+                                    pos_m=np.array(lower_mount, dtype=float),
+                                    inertial_body_name="head_lower_jaw_body",
+                                    joints=(lower_claw_follower,),
+                                    geoms=(
+                                        MujocoGeomSpec(
+                                            name="head_lower_jaw_live",
+                                            geom_type="capsule",
+                                            fromto_m=tuple(float(value) for value in (0.0, 0.0, 0.0, *lower_jaw)),
+                                            size="0.004",
+                                            material="structure",
+                                            contype="1",
+                                            conaffinity="1",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
     )
 
-    return (neck_yaw_hinge, neck_pitch_hinge, head_claw_driver, lower_claw_follower)
+
+def add_articulated_head_chain(
+    root_body: ET.Element,
+    model: stage1.MassModel,
+    joint_specs: tuple[Stage4JointSpec, ...],
+    origin_m: np.ndarray | None = None,
+    mass_assignments: dict[str, tuple[stage1.MassElement, ...]] | None = None,
+    body_origins: dict[str, np.ndarray] | None = None,
+) -> tuple[Stage4HingeExport, ...]:
+    topology = MujocoTopologySpec(
+        root_geoms=(),
+        root_children=head_chain_body_specs(model, joint_specs, origin_m),
+    )
+    return emit_mujoco_topology_spec(root_body, topology, mass_assignments, body_origins)
 
 
 def add_payload_sites(root_body: ET.Element, rod_model: rods.RodModel, show_auxiliary_geoms: bool) -> None:
@@ -904,6 +1085,79 @@ def ensure_xml_section(root: ET.Element, section_name: str) -> ET.Element:
     return section
 
 
+def viewer_safe_topology_spec(
+    case: Stage4Case,
+    model: stage1.MassModel,
+    joint_specs: tuple[Stage4JointSpec, ...],
+    foot_radius_m: float,
+    friction_coeff: float,
+) -> MujocoTopologySpec:
+    specs_by_name = {spec.name: spec for spec in joint_specs}
+
+    pose = model.pose
+    yaw_origin = pose.yaw_joint
+    pitch_origin = pose.pitch_joint
+    rear_root_geoms = rod_geom_specs_for_members(
+        case.rod_model,
+        lambda member: member.name == "rear_body_spine" or member.name.startswith("rear_") and member.group == "hip_cross",
+    )
+
+    rear_leg_specs = leg_chain_body_specs(
+            model,
+            joint_specs,
+            foot_radius_m,
+            friction_coeff,
+            show_auxiliary_geoms=False,
+            add_contact_feet=True,
+            leg_names=("rear_left", "rear_right"),
+    )
+
+    waist_yaw_hinge = hinge_export_from_joint(specs_by_name["waist_yaw"])
+    waist_pitch_hinge = hinge_export_from_joint(specs_by_name["waist_pitch"])
+    waist_yaw_geoms = rod_geom_specs_for_members(
+        case.rod_model,
+        lambda member: member.name == "waist_yaw_pitch",
+        origin_m=yaw_origin,
+    )
+    waist_pitch_geoms = rod_geom_specs_for_members(
+        case.rod_model,
+        lambda member: member.name == "front_body_spine" or member.name.startswith("front_") and member.group == "hip_cross",
+        origin_m=pitch_origin,
+    )
+    front_leg_specs = leg_chain_body_specs(
+            model,
+            joint_specs,
+            foot_radius_m,
+            friction_coeff,
+            show_auxiliary_geoms=False,
+            add_contact_feet=True,
+            leg_names=("front_left", "front_right"),
+            origin_m=pitch_origin,
+    )
+    head_specs = head_chain_body_specs(model, joint_specs, origin_m=pitch_origin)
+
+    waist_pitch_spec = MujocoBodySpec(
+        name="waist_pitch_body",
+        pos_m=np.array(pitch_origin - yaw_origin, dtype=float),
+        inertial_body_name="waist_pitch_body",
+        joints=(waist_pitch_hinge,),
+        geoms=waist_pitch_geoms,
+        children=(*front_leg_specs, *head_specs),
+    )
+    waist_yaw_spec = MujocoBodySpec(
+        name="waist_yaw_body",
+        pos_m=np.array(yaw_origin, dtype=float),
+        inertial_body_name="waist_yaw_body",
+        joints=(waist_yaw_hinge,),
+        geoms=waist_yaw_geoms,
+        children=(waist_pitch_spec,),
+    )
+    return MujocoTopologySpec(
+        root_geoms=rear_root_geoms,
+        root_children=(*rear_leg_specs, waist_yaw_spec),
+    )
+
+
 def add_viewer_safe_articulated_body_tree(
     root_body: ET.Element,
     case: Stage4Case,
@@ -914,87 +1168,8 @@ def add_viewer_safe_articulated_body_tree(
     mass_assignments: dict[str, tuple[stage1.MassElement, ...]],
     body_origins: dict[str, np.ndarray],
 ) -> tuple[Stage4HingeExport, ...]:
-    specs_by_name = {spec.name: spec for spec in joint_specs}
-
-    pose = model.pose
-    yaw_origin = pose.yaw_joint
-    pitch_origin = pose.pitch_joint
-    hinges: list[Stage4HingeExport] = []
-
-    add_rod_geoms_for_members(
-        root_body,
-        case.rod_model,
-        lambda member: member.name == "rear_body_spine" or member.name.startswith("rear_") and member.group == "hip_cross",
-    )
-    hinges.extend(
-        add_articulated_leg_chains(
-            root_body,
-            model,
-            joint_specs,
-            foot_radius_m,
-            friction_coeff,
-            show_auxiliary_geoms=False,
-            add_contact_feet=True,
-            leg_names=("rear_left", "rear_right"),
-            mass_assignments=mass_assignments,
-            body_origins=body_origins,
-        )
-    )
-
-    waist_yaw_body = ET.SubElement(root_body, "body", name="waist_yaw_body", pos=xml_vec(yaw_origin))
-    add_body_inertial(waist_yaw_body, "waist_yaw_body", mass_assignments, body_origins)
-    waist_yaw_hinge = hinge_export_from_joint(specs_by_name["waist_yaw"])
-    add_hinge_joint(waist_yaw_body, waist_yaw_hinge)
-    hinges.append(waist_yaw_hinge)
-    add_rod_geoms_for_members(
-        waist_yaw_body,
-        case.rod_model,
-        lambda member: member.name == "waist_yaw_pitch",
-        origin_m=yaw_origin,
-    )
-
-    waist_pitch_body = ET.SubElement(
-        waist_yaw_body,
-        "body",
-        name="waist_pitch_body",
-        pos=xml_vec(pitch_origin - yaw_origin),
-    )
-    add_body_inertial(waist_pitch_body, "waist_pitch_body", mass_assignments, body_origins)
-    waist_pitch_hinge = hinge_export_from_joint(specs_by_name["waist_pitch"])
-    add_hinge_joint(waist_pitch_body, waist_pitch_hinge)
-    hinges.append(waist_pitch_hinge)
-    add_rod_geoms_for_members(
-        waist_pitch_body,
-        case.rod_model,
-        lambda member: member.name == "front_body_spine" or member.name.startswith("front_") and member.group == "hip_cross",
-        origin_m=pitch_origin,
-    )
-    hinges.extend(
-        add_articulated_leg_chains(
-            waist_pitch_body,
-            model,
-            joint_specs,
-            foot_radius_m,
-            friction_coeff,
-            show_auxiliary_geoms=False,
-            add_contact_feet=True,
-            leg_names=("front_left", "front_right"),
-            origin_m=pitch_origin,
-            mass_assignments=mass_assignments,
-            body_origins=body_origins,
-        )
-    )
-    hinges.extend(
-        add_articulated_head_chain(
-            waist_pitch_body,
-            model,
-            joint_specs,
-            origin_m=pitch_origin,
-            mass_assignments=mass_assignments,
-            body_origins=body_origins,
-        )
-    )
-    return tuple(hinges)
+    topology = viewer_safe_topology_spec(case, model, joint_specs, foot_radius_m, friction_coeff)
+    return emit_mujoco_topology_spec(root_body, topology, mass_assignments, body_origins)
 
 
 def viewer_exported_joint_specs(joint_specs: tuple[Stage4JointSpec, ...]) -> tuple[Stage4JointSpec, ...]:
@@ -1384,6 +1559,19 @@ def summary_dict(case: Stage4Case) -> dict[str, Any]:
         if case.viewer_safe and case.stage3_case.frames
         else {}
     )
+    topology_body_count = (
+        count_topology_bodies(
+            viewer_safe_topology_spec(
+                case,
+                case.stage3_case.frames[0].model,
+                exported_specs,
+                DEFAULT_FOOT_RADIUS_M,
+                DEFAULT_FOOT_FRICTION,
+            )
+        )
+        if case.viewer_safe and case.stage3_case.frames
+        else 0
+    )
     return {
         "stage": "stage_4_mujoco_contact_first_light",
         "primitive": case.primitive,
@@ -1396,6 +1584,7 @@ def summary_dict(case: Stage4Case) -> dict[str, Any]:
             "viewer_safe_uses_mujoco_foot_contacts": case.viewer_safe,
             "viewer_safe_uses_distributed_stage1_mass": case.viewer_safe,
             "viewer_safe_separates_leg_dofs_into_bodies": case.viewer_safe,
+            "viewer_safe_uses_data_topology_tree": case.viewer_safe,
             "torque_limited_mujoco_motors": True,
             "position_servo_actuators": False,
             "contact_loadcases_from_mujoco": case.contact_csv_result.completed,
@@ -1419,6 +1608,7 @@ def summary_dict(case: Stage4Case) -> dict[str, Any]:
             "actuator_motors": len(exported_specs),
             "foot_contact_geoms": len(LEG_ORDER),
             "distributed_mujoco_inertial_bodies": len(mass_assignments),
+            "viewer_safe_topology_bodies": topology_body_count,
             "mujoco_contact_rows": case.contact_csv_result.rows,
         },
         "mass": {
@@ -1461,6 +1651,7 @@ def summary_dict(case: Stage4Case) -> dict[str, Any]:
         },
         "notes": [
             "The MuJoCo XML is a rough whole-body model built from the Stage 2 rod graph and Stage 3 pose.",
+            "The default viewer body tree is emitted from a data topology tree, not hand-written nested XML calls.",
             "Viewer-safe waist, leg, neck, and head controls are wired to articulated visible geometry.",
             "The viewer entry uses MuJoCo gravity plus foot contact geoms, not invisible foot-pin equalities.",
             "Visible structural capsules are collision-enabled; geometry is still coarse rods, not CAD solids.",

@@ -27,6 +27,8 @@ Stage 4 first-light 不是完整行走仿真，也不是闭环 balance controlle
   jaw 和 lower jaw 由同一个 control 反向联动，对称开合。
 - 默认 actuator 是 MuJoCo torque motor，control slider 是 Nm 级扭矩命令，
   不是 position-servo angle target。
+- 默认 MuJoCo body tree 由 `MujocoTopologySpec` / `MujocoBodySpec` 数据树
+  递归 emit，不再由 viewer-safe builder 手写 nested `<body>` XML 调用。
 - 导出四个 foot contact geoms、collision-enabled structural capsule geoms
   和 ground plane。
 - 默认 MuJoCo GUI 模型把 `mass_model.py` / `pygame_mass_viewer.py` 同源的
@@ -46,6 +48,7 @@ Stage 4 first-light 不是完整行走仿真，也不是闭环 balance controlle
 - frictional tangential force solve
 - collision-rich CAD geometry
 - measured hip bearing spacing / servo housing geometry
+- arbitrary robot topology loaded from an external schema
 - MuJoCo-to-FEM automatic load application
 - proof that the robot can stand or walk
 

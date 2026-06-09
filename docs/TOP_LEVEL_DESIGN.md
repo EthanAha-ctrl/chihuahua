@@ -12,6 +12,7 @@ geometry
  -> structural FEM iteration
  -> IK and control
  -> MuJoCo simulation
+ -> complex terrain IK
  -> printable CAD implementation
 ```
 
@@ -371,9 +372,67 @@ MuJoCo failure
  -> simulate again
 ```
 
-## Stage 5: Printing Implementation
+## Stage 5: Complex Terrain IK
 
-只有当 mass、torque、FEM、IK 和 MuJoCo 都达到最低可信度之后，才开始完整打印实施。
+阶段 4 做完之后，不应该立刻进入打印。Stage 5 的目标是把前面得到的
+mass、torque、FEM、IK 和 MuJoCo 结果转成复杂地形上的运动能力定义。
+
+Stage 5 不做新的结构设计，不启动打印实施，也不把 MuJoCo first-light 当成
+真实野外能力。它专门回答：
+
+```text
+复杂地形下脚该落在哪里？
+body pose 应该如何随地形变化？
+IK 如何避开 joint limit 和 torque limit？
+支撑脚集合如何切换？
+COM 如何留在可恢复区域？
+哪些地形应该拒绝进入？
+```
+
+Stage 5 的核心输入：
+
+```text
+Stage 1 mass / COM / torque margin
+Stage 2 FEM hot spots and load-path limits
+Stage 3 IK / control safety limits
+Stage 4 MuJoCo contact and failure evidence
+terrain height samples / slope / step edges
+foot friction assumptions
+support polygon / contact candidate set
+```
+
+Stage 5 的核心能力：
+
+```text
+terrain-aware foot target selection
+terrain-aware body height and body attitude selection
+per-leg IK over uneven contact targets
+support-foot scheduling
+COM and support polygon check
+torque margin check under terrain pose
+joint-limit avoidance
+terrain refusal / recovery decision
+MuJoCo replay of terrain IK commands
+```
+
+Stage 5 的输出：
+
+```text
+terrain IK solver
+terrain gait command table
+terrain contact candidate table
+terrain safety / refusal rules
+terrain replay cases for MuJoCo
+failure mode report
+updated control limits
+```
+
+阶段 5 做完后，才允许讨论打印实施。
+
+## Stage 6: Printing Implementation
+
+只有当 mass、torque、FEM、IK、MuJoCo 和复杂地形 IK 都达到最低可信度之后，
+才开始完整打印实施。
 
 打印实施不是探索主设计，而是验证制造和装配：
 
@@ -389,7 +448,7 @@ serviceability
 field repair
 ```
 
-阶段 5 应该优先打印：
+阶段 6 应该优先打印：
 
 ```text
 material coupons
@@ -414,6 +473,7 @@ known COM estimate
 known torque margin
 known FEM margin
 known MuJoCo behavior
+known complex terrain IK behavior
 ```
 
 ## Development Loop
@@ -428,8 +488,9 @@ known MuJoCo behavior
 5. update reinforcement
 6. update IK / control limits
 7. run MuJoCo
-8. record failure modes
-9. repeat
+8. update complex terrain IK
+9. record failure modes
+10. repeat
 ```
 
 每一轮至少记录：
@@ -446,6 +507,7 @@ joint torque margins
 whole-robot FEM stress / deformation hot spots
 control limitations
 MuJoCo results
+complex terrain IK results
 next design decision
 ```
 
@@ -461,7 +523,8 @@ next design decision
 5. Add versioned design reports.
 6. Document external Stage 2 FEM dependencies.
 7. Prepare whole-robot FEM export / load-case generation.
-8. Later add IK and MuJoCo export.
+8. Define complex terrain IK stage before printing.
+9. Later prepare printing implementation.
 ```
 
 建议新增文件结构：
@@ -476,6 +539,7 @@ mass_model.py
 torque_model.py
 fem_loadcases.py
 mujoco_export.py
+terrain_ik.py
 ```
 
 当前 `endpoint_geometry.py` 可以保留为几何压力计，但它不应该再是项目的顶层真相。顶层真相应该变成：
