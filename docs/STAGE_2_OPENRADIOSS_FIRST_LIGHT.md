@@ -25,9 +25,9 @@ repo。它们是本机 sandbox artifacts。
 ## Sources
 
 - OpenRadioss release:
-  `https://github.com/OpenRadioss/OpenRadioss/releases/tag/latest-20260520`
+  `https://github.com/OpenCourant/extlib/releases/tag/upstream-latest-20260728-linux64`
 - Linux binary:
-  `https://github.com/OpenRadioss/OpenRadioss/releases/download/latest-20260520/OpenRadioss_linux64.zip`
+  `https://github.com/OpenCourant/extlib/releases/download/upstream-latest-20260728-linux64/OpenRadioss_linux64.zip`
 - Official running docs:
   `https://openradioss.atlassian.net/wiki/spaces/OPENRADIOSS/pages/19628079/Running+OpenRadioss`
 - Official tensile test page:
@@ -37,12 +37,12 @@ repo。它们是本机 sandbox artifacts。
 
 ## Known-Good Versions
 
-This run used:
+Solver package (tensile results below are from the original `latest-20260520` run):
 
 ```text
-OpenRadioss tag: latest-20260520
+OpenRadioss tag: latest-20260728
 archive: OpenRadioss_linux64.zip
-sha256: 7405c003f59198b1edde118a5dbf8aacf55fbe1415bbc3ca73d9e8e82a400ee0
+sha256: 598ed7b2905a7bacc8d1781470c250ac79d7558c39ba962768edf3644644fe33
 platform: Linux x86_64
 example: Tensile_Test_Section1.zip / 1_LAW2
 ```
@@ -53,7 +53,7 @@ Use a sandbox outside this repository:
 
 ```bash
 export OR_ROOT=/mnt/s8t/openradioss
-export OR_TAG=latest-20260520
+export OR_TAG=latest-20260728
 mkdir -p "$OR_ROOT/downloads" "$OR_ROOT/runs"
 ```
 
@@ -63,7 +63,7 @@ Expected layout after the steps below:
 /mnt/s8t/openradioss/
   downloads/
     OpenRadioss_linux64.zip
-  latest-20260520/
+  latest-20260728/
     OpenRadioss/
       exec/
         starter_linux64_gf
@@ -92,7 +92,7 @@ Download and verify the Linux binary package:
 cd "$OR_ROOT/downloads"
 curl -L --fail --show-error \
   -o OpenRadioss_linux64.zip \
-  "https://github.com/OpenRadioss/OpenRadioss/releases/download/$OR_TAG/OpenRadioss_linux64.zip"
+  "https://github.com/OpenCourant/extlib/releases/download/upstream-$OR_TAG-linux64/OpenRadioss_linux64.zip"
 
 sha256sum OpenRadioss_linux64.zip
 ```
@@ -100,7 +100,7 @@ sha256sum OpenRadioss_linux64.zip
 Expected hash:
 
 ```text
-7405c003f59198b1edde118a5dbf8aacf55fbe1415bbc3ca73d9e8e82a400ee0  OpenRadioss_linux64.zip
+598ed7b2905a7bacc8d1781470c250ac79d7558c39ba962768edf3644644fe33  OpenRadioss_linux64.zip
 ```
 
 Unzip:
