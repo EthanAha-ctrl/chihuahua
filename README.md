@@ -83,3 +83,36 @@ life context -> embodied behavior -> social learning -> survival adaptation
 
 
 mechanical tendon stop + 凹轮
+
+
+mon père，三款里 GIM4305-10 扭矩密度最高（~25 Nm/kg）也最便宜。DM-J3507 软件生态最好，自带输出端绝对编码器和 MIT 模式，但减速器类型和背隙都查不到。GIM3505-8 最小（97 g），只有约 1.3–1.8 Nm。
+
+| | SteadyWin GIM3505-8 | SteadyWin GIM4305-10 | DAMIAO DM-J3507-2EC |
+|---|---|---|---|
+| 减速 | 8:1 行星 | 10:1 行星 | 7:1，类型未标明 |
+| 重量 | 84 g 裸机 / 97 g 含驱动 | 140 g 裸机 / 150 g 含驱动 | 150 g，驱动集成 |
+| 尺寸 | 未查到 | Ø53×26 mm | Ø46×37.9 mm |
+| 额定扭矩 | 0.65–0.67 Nm | ~1.0 Nm | 0.8 Nm |
+| 堵转/峰值扭矩 | 1.27 Nm（GDS34）/ 1.79 Nm（GDZ34） | 3.47–3.82 Nm | 3 Nm |
+| 峰值扭矩/重量（含驱动） | ~13–18 Nm/kg | ~23–25 Nm/kg | ~20 Nm/kg |
+| 转速 | 额定 ~234–300 rpm | 额定 ~300 rpm，最高 366–402 rpm | 额定 150 rpm，空载 460 rpm |
+| 背隙 | 15 arcmin | 15 arcmin | 未公布 |
+| 编码器 | 14-bit | 14-bit，可选外接第二编码器 | 双 14-bit，输出端单圈绝对 |
+| 通信 | CAN | CAN | CAN 1 Mbps（MIT/速度/位置模式）+ UART |
+| 价格 | 未查到 | 裸机 ~$70，含驱动 $115–125 | ~$120 |
+| 已知使用 | ALOHA 配件、小四足 | Stanford Pupper V3 | — |
+
+注意：
+- GIM3505 的 1.5 kg 应该是包装重量，实际是 84/97 g。它的扭矩各处标的不一致，老版本只有 0.43/0.85 Nm。
+- SteadyWin 标的是“堵转扭矩”，DAMIAO 标的是“峰值扭矩”，口径可能不同，不能直接横比。
+- 数据大多来自经销商页面，没有找到官方 datasheet。
+
+Sources:
+- [GIM3505-8（openelab）](https://openelab.io/products/steadywin-gim3505-8-planetary-gear-motor)
+- [GIM3505-8（rcdrone）](https://rcdrone.top/products/steadywin-gim3505-8-planetary-reducer-servo-motor)
+- [GIM3505-8 旧版手册](https://manuals.plus/ae/1005006647908292)
+- [GIM4305-10 安装手册](https://manuals.plus/steadywin/gim4305-10shs-planetary-reducer-servo-motor-manual)
+- [GIM4305-10（aifitlab）](https://aifitlab.com/products/steadywin-gim4305-planetary-reducer-servo-motor)
+- [Pupper V3 specs](https://pupper-v3-documentation.readthedocs.io/en/latest/learn_more/tech_specs.html)
+- [DM-J3507-2EC（aifitlab）](https://aifitlab.com/products/damiao-dm-j3507-2ec-motor)
+- [DM-J3507-2EC（roboticscenter）](https://www.roboticscenter.ai/ar/store/product/damiao-dm-j3507-2ec)
