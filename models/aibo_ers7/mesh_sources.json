@@ -1,0 +1,81 @@
+{
+  "repository": "dkotfis/aibo_ros",
+  "revision": "eec7a9dc21779a289eb3bfa48d66cedd830176d3",
+  "meshes": {
+    "package://aibo_description/meshes/LBdown.stl": {
+      "file": "source_meshes/meshes/LBdown.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LBdown.stl",
+      "sha256": "483d85d0c8ddb655de124c165b8debf135fa35028aa6611f126bacda7c4d8dbd"
+    },
+    "package://aibo_description/meshes/LBpaw.stl": {
+      "file": "source_meshes/meshes/LBpaw.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LBpaw.stl",
+      "sha256": "6cee836641285a6a2d25b89dd3ca731839ba58a6306f9781cf7bd13ae91e9f5c"
+    },
+    "package://aibo_description/meshes/LBup.stl": {
+      "file": "source_meshes/meshes/LBup.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LBup.stl",
+      "sha256": "e15d6efc5170a48428c1f29fca71a00916d29b3cbf0becb8f8c45cc77a866028"
+    },
+    "package://aibo_description/meshes/LFdown.stl": {
+      "file": "source_meshes/meshes/LFdown.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LFdown.stl",
+      "sha256": "f243198b52d7700c1bc6087d1e4abd8ce93a1838cedcedd63067b5619888fcb5"
+    },
+    "package://aibo_description/meshes/LFpaw.stl": {
+      "file": "source_meshes/meshes/LFpaw.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LFpaw.stl",
+      "sha256": "e75b2345c7e5466390fb6fa88817c224ef46c17c548678a45859e7746e7105c3"
+    },
+    "package://aibo_description/meshes/LFup.stl": {
+      "file": "source_meshes/meshes/LFup.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/LFup.stl",
+      "sha256": "beec99d7d63bab9bb89289f6b5a0ac415f86516a135f14df2f01a21ed140faa6"
+    },
+    "package://aibo_description/meshes/RBdown.stl": {
+      "file": "source_meshes/meshes/RBdown.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RBdown.stl",
+      "sha256": "7a7825a06595c476ab1bc89613572b11539a073558d78039175c1da73f91bc75"
+    },
+    "package://aibo_description/meshes/RBpaw.stl": {
+      "file": "source_meshes/meshes/RBpaw.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RBpaw.stl",
+      "sha256": "e93bed6c340742aa70ef7298b16d7c1f3f57c3af7262c30a985f20d2be267dc1"
+    },
+    "package://aibo_description/meshes/RBup.stl": {
+      "file": "source_meshes/meshes/RBup.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RBup.stl",
+      "sha256": "cb5acd09d00b1e545d4db237bc8b055f642f3af1797532139b868ee15d7f9358"
+    },
+    "package://aibo_description/meshes/RFdown.stl": {
+      "file": "source_meshes/meshes/RFdown.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RFdown.stl",
+      "sha256": "ca7b4c0aa971fc33059b0ed73ed32e712410f14f92d7fc8e2015afcc9a6b5c99"
+    },
+    "package://aibo_description/meshes/RFpaw.stl": {
+      "file": "source_meshes/meshes/RFpaw.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RFpaw.stl",
+      "sha256": "f5f194dbbe9d003a9d06f1c496c1c54d27a6064cac9f85afdb2829205d61d24c"
+    },
+    "package://aibo_description/meshes/RFup.stl": {
+      "file": "source_meshes/meshes/RFup.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/RFup.stl",
+      "sha256": "6279b5e1672bbde512bd89a72fda98ff1c216f9f98354b3e43a3509c49acdc1c"
+    },
+    "package://aibo_description/meshes/body1.stl": {
+      "file": "source_meshes/meshes/body1.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/body1.stl",
+      "sha256": "efefcbd6eb383c6048037f204ec6246253ceaa2d00f02cbeaa8c5584a8f52b79"
+    },
+    "package://aibo_description/meshes/head.stl": {
+      "file": "source_meshes/meshes/head.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/head.stl",
+      "sha256": "753719cb7a2fa452d28ac1b77eeb64e15975e186fa7ad3d62d0d60e33dc69b97"
+    },
+    "package://aibo_description/meshes/tail.stl": {
+      "file": "source_meshes/meshes/tail.stl",
+      "url": "https://raw.githubusercontent.com/dkotfis/aibo_ros/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description/meshes/tail.stl",
+      "sha256": "78f8383ee1a13800f569a25ef19e39d2489e2a1e8d96172b2318a11b994ef713"
+    }
+  }
+}

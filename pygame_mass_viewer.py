@@ -2,6 +2,7 @@
 """Interactive pygame Stage 1 mass, torque, and Stage 3 command viewer.
 
 No solid body rendering. No FEM. No controller.
+Go2 / Aibo ERS-7 use native URDF kinematics with URDF joint limits.
 
 The drawing is still a constrained linkage diagram, with a rough Stage 1
 electromechanical overlay:
@@ -23,7 +24,7 @@ import argparse
 import math
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -38,6 +39,7 @@ except ModuleNotFoundError as exc:
 from endpoint_geometry import LEG_ORDER
 import mass_model as stage1
 import stage3_ik_control as stage3
+import urdf_linkage as urdf
 from dog_description import (
     DEFAULT_DESCRIPTION_PATH,
     DogDescription,
@@ -169,11 +171,12 @@ class MaterialOverlay:
 
 @dataclass(frozen=True)
 class Stage1Telemetry:
-    catalog: stage1.PhysicalCatalog
-    model: stage1.MassModel
+    catalog: stage1.PhysicalCatalog | None
+    model: stage1.MassModel | UrdfMassSnapshot
     torque_rows: list[stage1.TorqueRow]
     worst_margin: stage1.TorqueRow
     largest_torque: stage1.TorqueRow
+    margin_basis: str = "continuous"
 
 
 @dataclass
@@ -918,15 +921,18 @@ def add_stage3_target_markers(
 ) -> None:
     if not viewer.show_stage3 or viewer.stage3_target_m is None:
         return
-    target = viewer.stage3_target_m
-    com = telemetry.model.com_m
-    error_color = (244, 114, 91) if viewer.stage3_target_error_m > 0.06 else (252, 211, 77)
-    add_line(commands, viewer.camera, screen_size, com, target, (86, 100, 116), 2)
-    add_joint(commands, viewer.camera, screen_size, target, 10, error_color, scale_radius=False)
-    effector_point = stage3_effector_point(telemetry.model, viewer.stage3_active_effector)
-    if effector_point is not None:
-        add_line(commands, viewer.camera, screen_size, effector_point, target, (128, 94, 180), 3)
-        add_joint(commands, viewer.camera, screen_size, effector_point, 7, (196, 181, 253), scale_radius=False)
+    draw_reach_markers(commands, viewer.camera, screen_size, telemetry.model.com_m,
+                       viewer.stage3_target_m, viewer.stage3_target_error_m,
+                       stage3_effector_point(telemetry.model, viewer.stage3_active_effector))
+
+
+def draw_reach_markers(commands, camera, screen_size, com, target, error, endpoint):
+    error_color = (244, 114, 91) if error > 0.06 else (252, 211, 77)
+    add_line(commands, camera, screen_size, com, target, (86, 100, 116), 2)
+    add_joint(commands, camera, screen_size, target, 10, error_color, scale_radius=False)
+    if endpoint is not None:
+        add_line(commands, camera, screen_size, endpoint, target, (128, 94, 180), 3)
+        add_joint(commands, camera, screen_size, endpoint, 7, (196, 181, 253), scale_radius=False)
 
 
 def stage3_effector_point(model: stage1.MassModel, effector: str) -> np.ndarray | None:
@@ -1120,8 +1126,11 @@ def draw_material_overlay(
 
     title = font.render(f"stage 1 material | {overlay.material_name}", True, (238, 241, 245))
     screen.blit(title, (panel.x + 20, panel.y + 20))
+    margin = (telemetry.worst_margin.max_margin if telemetry.margin_basis == "URDF effort"
+              else telemetry.worst_margin.continuous_margin)
+    margin_text = "N/A" if margin is None else f"{margin:.2f}x"
     mass_line = small_font.render(
-        f"mass {telemetry.model.total_mass_kg:.3f} kg | worst margin {telemetry.worst_margin.continuous_margin:.2f}x",
+        f"mass {telemetry.model.total_mass_kg:.3f} kg | {telemetry.margin_basis} margin {margin_text}",
         True,
         (216, 224, 232),
     )
@@ -1242,7 +1251,9 @@ def handle_stage3_overlay_event(
     viewer: ViewerState,
     overlay: Stage3Overlay,
     description: DogDescription,
+    set_value=None,
 ) -> bool:
+    write = set_value or (lambda key, value: set_joint_command_deg(viewer, description, key, value))
     if not viewer.show_stage3:
         return False
 
@@ -1255,9 +1266,7 @@ def handle_stage3_overlay_event(
                 viewer.stage3_auto_reach = False
                 viewer.joint_babble = False
                 viewer.waist_babble = False
-                set_joint_command_deg(
-                    viewer,
-                    description,
+                write(
                     control.key,
                     stage3_slider_value_from_x(control, description, event.pos[0]),
                 )
@@ -1270,9 +1279,7 @@ def handle_stage3_overlay_event(
         if control is None:
             overlay.active_key = None
             return False
-        set_joint_command_deg(
-            viewer,
-            description,
+        write(
             control.key,
             stage3_slider_value_from_x(control, description, event.pos[0]),
         )
@@ -1294,6 +1301,8 @@ def draw_stage3_overlay(
     overlay: Stage3Overlay,
     description: DogDescription,
     telemetry: Stage1Telemetry,
+    *, values: dict[str, float] | None = None,
+    selected_keys: set[str] | None = None,
 ) -> None:
     if not viewer.show_stage3:
         return
@@ -1311,9 +1320,9 @@ def draw_stage3_overlay(
 
     for control in overlay.controls:
         spec = description.joint_ranges[control.spec_name]
-        value = joint_command_deg(viewer, description, control.key)
+        value = joint_command_deg(viewer, description, control.key) if values is None else values[control.key]
         active = overlay.active_key == control.key
-        selected = command_reaches_active_effector(control.key, viewer.stage3_active_effector)
+        selected = command_reaches_active_effector(control.key, viewer.stage3_active_effector) if selected_keys is None else control.key in selected_keys
         label_color = (232, 240, 249) if control.key in HEAD_COMMAND_KEYS else (181, 193, 207)
         if selected:
             label_color = (167, 243, 208)
@@ -1334,7 +1343,8 @@ def draw_stage3_overlay(
                 (zero_x, control.rect.bottom + 4),
                 1,
             )
-        knob_x = stage3_slider_x_from_value(control, description, viewer)
+        fraction = 0. if spec.max_deg == spec.min_deg else clamp((value-spec.min_deg)/(spec.max_deg-spec.min_deg), 0., 1.)
+        knob_x = int(control.rect.left + fraction*control.rect.width)
         fill_left = min(zero_x, knob_x)
         fill_width = max(2, abs(knob_x - zero_x))
         bar_color = (124, 93, 196) if control.key in HEAD_COMMAND_KEYS else (70, 125, 156)
@@ -1666,6 +1676,26 @@ def draw_tuning_overlay(
     screen.blit(status_surface, (panel.x + 20, panel.bottom - 38))
 
 
+def draw_status_panel(screen, font, small_font, viewer, lines, help_lines):
+    height = 40 + len(lines)*34 + (12 + len(help_lines)*30 if viewer.show_help else 0)
+    panel = pygame.Rect(16, 16, min(screen.get_width()-32, 1080), height)
+    pygame.draw.rect(screen, (22, 27, 33), panel, border_radius=8)
+    pygame.draw.rect(screen, (70, 79, 91), panel, width=1, border_radius=8)
+    y = panel.y+20
+    for i, line in enumerate(lines):
+        surface = font.render(line, True, (238, 241, 245) if i == 0 else (207, 214, 222))
+        if surface.get_width() > panel.width-40:
+            scale = (panel.width-40)/surface.get_width()
+            surface = pygame.transform.smoothscale(surface, (panel.width-40, max(1, int(surface.get_height()*scale))))
+        screen.blit(surface, (panel.x+20, y))
+        y += 34
+    if viewer.show_help:
+        y += 12
+        for line in help_lines:
+            screen.blit(small_font.render(line, True, (158, 169, 181)), (panel.x+20, y))
+            y += 30
+
+
 def draw_text_panel(
     screen: pygame.Surface,
     font: pygame.font.Font,
@@ -1675,11 +1705,6 @@ def draw_text_panel(
     telemetry: Stage1Telemetry,
     fps: float,
 ) -> None:
-    panel_width = min(screen.get_width() - 32, 1080)
-    panel = pygame.Rect(16, 16, panel_width, 484 if viewer.show_help else 278)
-    pygame.draw.rect(screen, (22, 27, 33), panel, border_radius=8)
-    pygame.draw.rect(screen, (70, 79, 91), panel, width=1, border_radius=8)
-
     com = telemetry.model.com_m
     margin = telemetry.worst_margin.continuous_margin
     lines = [
@@ -1703,15 +1728,7 @@ def draw_text_panel(
     if viewer.dof_solo:
         lines.append(f"DOF solo {viewer.dof_index % len(DOF_KEYS) + 1:02d}/{len(DOF_KEYS)} | {active_dof_key(viewer)}")
 
-    y = panel.y + 20
-    for i, line in enumerate(lines):
-        surface = font.render(line, True, (238, 241, 245) if i == 0 else (207, 214, 222))
-        screen.blit(surface, (panel.x + 20, y))
-        y += 34
-
-    if viewer.show_help:
-        y += 12
-        help_lines = [
+    help_lines = [
             "left/right or A/D: waist yaw    up/down or W/S: waist pitch",
             "space: freeze motion",
             "M: 21-DOF solo    N: next solo DOF",
@@ -1719,12 +1736,10 @@ def draw_text_panel(
             "G: stage 3 command bars    R: random best-effector reach auto/manual",
             "left-drag mouse: orbit camera    wheel: zoom",
             "Y: material/torque overlay    T: geometry tuning overlay",
+            "1: Chihuahua    2: Go2    3: Aibo ERS-7    4: Pupper v3",
             "P: screenshot    ?: help    Esc: quit",
         ]
-        for line in help_lines:
-            surface = small_font.render(line, True, (158, 169, 181))
-            screen.blit(surface, (panel.x + 20, y))
-            y += 30
+    draw_status_panel(screen, font, small_font, viewer, lines, help_lines)
 
 
 def clamp_joint_degrees(value: float, spec: JointRange) -> float:
@@ -1818,12 +1833,349 @@ def save_screenshot(screen: pygame.Surface, path: Path) -> None:
     print(f"saved screenshot: {path}")
 
 
+@dataclass(frozen=True)
+class UrdfMassSnapshot:
+    total_mass_kg: float
+    com_m: np.ndarray
+
+
+def build_urdf_material_overlay() -> MaterialOverlay:
+    return MaterialOverlay("URDF relative density", [MaterialControl(
+        "density_ratio", "density", "x URDF", 1., 1., 1., .5, 1.5)])
+
+
+def make_urdf_telemetry(state: UrdfViewerState, poses: dict[str, np.ndarray]) -> Stage1Telemetry:
+    ratio = state.material_overlay.controls[0].value_si
+    if not math.isfinite(ratio) or ratio <= 0:
+        raise ValueError("URDF relative density must be finite and positive")
+    elements = {name: stage1.MassElement(name, "urdf_link", link.mass * ratio,
+                poses[name][:3, :3] @ link.com + poses[name][:3, 3])
+                for name, link in state.model.links.items()}
+    descendants = {name: {name} for name in state.model.links}
+    for joint in reversed(state.model.joints):
+        descendants[joint.parent].update(descendants[joint.child])
+    rows = []
+    alpha = stage1.Stage1Assumptions().joint_angular_accel_rad_s2
+    for joint in state.model.movable:
+        frame = poses[joint.parent] @ joint.transform
+        required = stage1.inertia_torque([elements[n] for n in descendants[joint.child]],
+                                         frame[:3, 3], frame[:3, :3] @ joint.axis, alpha)
+        margin = None if joint.effort is None else stage1.margin(joint.effort, required)
+        rows.append(stage1.TorqueRow(state.model.name, joint.name, "URDF effort",
+                    required, 0., joint.effort if joint.effort is not None else 0., None, margin,
+                    "free-space point-mass inertia; alpha=10 rad/s2; continuous torque unavailable"))
+    if not rows:
+        raise ValueError("URDF has no movable joints for torque estimation")
+    finite = [row for row in rows if row.max_margin is not None]
+    worst = min(finite, key=lambda row: row.max_margin) if finite else rows[0]
+    mass, com = state.model.mass_com(poses)
+    return Stage1Telemetry(None, UrdfMassSnapshot(mass * ratio, com), rows, worst,
+                           max(rows, key=lambda row: row.required_torque_nm), "URDF effort")
+
+
+@dataclass
+class JointControlDescription:
+    joint_ranges: dict[str, JointRange]
+
+
+@dataclass
+class UrdfViewerState:
+    model: urdf.UrdfModel
+    material_overlay: MaterialOverlay = field(default_factory=build_urdf_material_overlay)
+    camera: Camera = field(default_factory=Camera)
+    angles: dict[str, float] = field(default_factory=dict)
+    root_transform: np.ndarray = field(default_factory=lambda: np.eye(4))
+    selected: int = 0
+    solo: bool = False
+    autoplay: bool = True
+    scale: float = 1.0
+    show_bounds: bool = False
+    target: np.ndarray | None = None
+    command_overlay: Stage3Overlay = field(default_factory=lambda: Stage3Overlay([]))
+    control_description: JointControlDescription = field(default_factory=lambda: JointControlDescription({}))
+    directions: dict[str, float] = field(default_factory=dict)
+    target_age: float = 0.0
+    reach_age: float = 0.0
+    effector: str = ""
+    reach_error: float = 0.0
+    reach_commands: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def active_joint(self) -> urdf.Joint:
+        return self.model.movable[self.selected]
+
+
+def create_urdf_viewer(key: str, args: argparse.Namespace) -> UrdfViewerState:
+    model = urdf.load_urdf(urdf.MODEL_PATHS[key])
+    state = UrdfViewerState(model, autoplay=not args.no_babble,
+                            solo=args.dof_solo, scale=args.babble_scale)
+    state.command_overlay = Stage3Overlay([Stage3JointControl(j.name, j.name, j.name) for j in model.movable])
+    state.control_description = JointControlDescription({j.name: JointRange(
+        False, 0., 0., j.lower_deg, j.upper_deg) for j in model.movable})
+    state.selected = args.dof_index % len(model.movable)
+    state.angles = {j.name: 0.0 for j in model.movable}
+    if key == "go2":
+        state.angles.update({j.name: 45.0 if "thigh" in j.name else -90.0
+                             for j in model.movable if "thigh" in j.name or "calf" in j.name})
+    elif key == "aibo":
+        # Aibo's source uses +Y forward; align it with the viewer's +X.
+        state.root_transform[:3, :3] = urdf.rotation(np.array([0., 0., 1.]), -math.pi / 2)
+    state.angles = {j.name: j.clamp(state.angles[j.name]) for j in model.movable}
+    poses = model.forward(state.angles, state.root_transform)
+    points = urdf_scene_points(model, poses)
+    state.root_transform[2, 3] -= float(points[:, 2].min())
+    fit_urdf_camera(state)
+    return state
+
+
+def urdf_scene_points(model: urdf.UrdfModel, poses: dict[str, np.ndarray]) -> np.ndarray:
+    points = [t[:3, 3] for t in poses.values()]
+    for link in model.links.values():
+        t = poses[link.name]
+        points.extend(link.edges.reshape(-1, 3) @ t[:3, :3].T + t[:3, 3])
+    return np.asarray(points)
+
+
+def fit_urdf_camera(state: UrdfViewerState) -> None:
+    points = urdf_scene_points(state.model, state.model.forward(state.angles, state.root_transform))
+    state.camera.target = (points.min(0) + points.max(0)) / 2
+    state.camera.distance = max(0.65, float(np.linalg.norm(np.ptp(points, axis=0))) * 1.7)
+
+
+def update_urdf_motion(state: UrdfViewerState, dt: float, paused: bool) -> None:
+    if paused or not state.autoplay:
+        return
+    for i, joint in enumerate(state.model.movable):
+        if not state.solo or i == state.selected:
+            direction = state.directions.get(joint.name, 1 if i % 2 == 0 else -1)
+            value = state.angles[joint.name] + dt * 60 * state.scale * direction
+            if value >= joint.upper_deg:
+                direction = -1
+            elif value <= joint.lower_deg:
+                direction = 1
+            state.angles[joint.name] = joint.clamp(value)
+            state.directions[joint.name] = direction
+
+
+def update_urdf_reach(state: UrdfViewerState, viewer: ViewerState,
+                      rng: np.random.Generator, dt: float) -> None:
+    if not viewer.show_stage3 or not viewer.stage3_auto_reach:
+        return
+    if viewer.motion_paused and state.target is not None:
+        return
+    state.target_age += min(dt, 1 / 60)
+    state.reach_age += min(dt, 1 / 60)
+    if state.target is None or state.target_age >= viewer.stage3_target_period_s:
+        _, com = state.model.mass_com(state.model.forward(state.angles, state.root_transform))
+        state.target = random_target_near_com(com, rng, viewer.stage3_target_radius_min_m,
+                                             viewer.stage3_target_radius_max_m)
+        state.target_age = 0.
+        state.reach_commands = {}
+    if not state.reach_commands or state.reach_age >= viewer.stage3_arbitration_period_s:
+        effectors = [name for name in state.model.links if name.endswith(("_foot", "_paw")) or name == "head"]
+        if not effectors:
+            raise ValueError("URDF has no configured reach effectors")
+        candidates = [(name, *urdf.solve_reach(state.model, state.angles, state.root_transform,
+                                               state.target, name)) for name in effectors]
+        state.effector, commands, state.reach_error = min(candidates, key=lambda c: c[2])
+        parents = {j.child: j for j in state.model.joints}
+        state.reach_commands = {}
+        link = state.effector
+        while link in parents:
+            joint = parents[link]
+            if joint.kind != "fixed":
+                state.reach_commands[joint.name] = commands[joint.name]
+            link = joint.parent
+        state.reach_age = 0.
+    state.angles.update(state.reach_commands)
+    poses = state.model.forward(state.angles, state.root_transform)
+    state.reach_error = float(np.linalg.norm(urdf.effector_point(state.model, poses, state.effector)-state.target))
+
+
+def handle_urdf_key(event: pygame.event.Event, viewer: ViewerState, state: UrdfViewerState) -> bool:
+    if event.key in (pygame.K_ESCAPE, pygame.K_q):
+        return False
+    if event.key == pygame.K_SPACE:
+        viewer.motion_paused = not viewer.motion_paused
+    elif event.key == pygame.K_b:
+        state.autoplay = not state.autoplay
+    elif event.key == pygame.K_m:
+        state.solo = not state.solo
+        state.autoplay = True
+        viewer.stage3_auto_reach = False
+    elif event.key in (pygame.K_n, pygame.K_RIGHTBRACKET, pygame.K_DOWN):
+        state.selected = (state.selected + 1) % len(state.model.movable)
+    elif event.key in (pygame.K_LEFTBRACKET, pygame.K_UP):
+        state.selected = (state.selected - 1) % len(state.model.movable)
+    elif event.key in (pygame.K_LEFT, pygame.K_a, pygame.K_RIGHT, pygame.K_d):
+        state.autoplay = False
+        viewer.stage3_auto_reach = False
+        direction = -1 if event.key in (pygame.K_LEFT, pygame.K_a) else 1
+        state.angles[state.active_joint.name] = state.active_joint.clamp(state.angles[state.active_joint.name] + direction * (15 if event.mod & pygame.KMOD_SHIFT else 2))
+    elif event.key == pygame.K_COMMA:
+        state.scale = max(0., state.scale - .1)
+    elif event.key == pygame.K_PERIOD:
+        state.scale += .1
+    elif event.key == pygame.K_r:
+        viewer.stage3_auto_reach = not viewer.stage3_auto_reach
+        state.target = None
+        state.command_overlay.status = ""
+    elif event.key == pygame.K_g:
+        viewer.show_stage3 = not viewer.show_stage3
+    elif event.key == pygame.K_y:
+        viewer.show_materials = not viewer.show_materials
+    elif event.key == pygame.K_v:
+        state.show_bounds = not state.show_bounds
+    elif event.key == pygame.K_f:
+        fit_urdf_camera(state)
+    elif event.key == pygame.K_0:
+        state.angles = {j.name: j.clamp(0.) for j in state.model.movable}
+        state.autoplay = False
+        viewer.stage3_auto_reach = False
+    elif event.key in (pygame.K_SLASH, pygame.K_QUESTION):
+        viewer.show_help = not viewer.show_help
+    return True
+
+
+def handle_urdf_mouse(event: pygame.event.Event, state: UrdfViewerState, viewer: ViewerState) -> bool:
+    def write(key, value):
+        state.selected = next(i for i, j in enumerate(state.model.movable) if j.name == key)
+        state.angles[key] = state.active_joint.clamp(value)
+        state.autoplay = False
+    return handle_stage3_overlay_event(event, viewer, state.command_overlay,
+                                       state.control_description, set_value=write)
+
+
+def urdf_joint_groups(model: urdf.UrdfModel, poses: dict[str, np.ndarray]) -> list[list[urdf.Joint]]:
+    """Group coincident display anchors; kinematic axes remain unchanged."""
+    groups: list[list[urdf.Joint]] = []
+    for joint in model.movable:
+        point = model.joint_point(joint, poses)
+        for group in groups:
+            if np.linalg.norm(point - model.joint_point(group[0], poses)) < 1e-9:
+                group.append(joint)
+                break
+        else:
+            groups.append([joint])
+    return groups
+
+
+def draw_urdf_viewer(screen: pygame.Surface, font: pygame.font.Font, small_font: pygame.font.Font,
+                     viewer: ViewerState, state: UrdfViewerState, key: str) -> None:
+    screen.fill((12, 15, 19))
+    state.camera.focal = min(screen.get_size()) * .8
+    poses = state.model.forward(state.angles, state.root_transform)
+    telemetry = make_urdf_telemetry(state, poses)
+    torque_rows = {row.joint: row for row in telemetry.torque_rows}
+    commands: list[DrawCommand] = []
+    draw_grid(commands, state.camera, screen.get_size())
+    for link in state.model.links.values():
+        t = poses[link.name]
+        if state.show_bounds:
+            edges = link.edges @ t[:3, :3].T + t[:3, 3]
+            for a, b in edges:
+                add_line(commands, state.camera, screen.get_size(), a, b, (68, 84, 104), 1)
+    root_link = state.model.links[state.model.root]
+    root_pose = poses[state.model.root]
+    root_center = (root_pose[:3, :3] @ root_link.edges.reshape(-1, 3).mean(0) + root_pose[:3, 3]
+                   if root_link.edges.size else root_pose[:3, 3])
+    incoming = {j.child: j for j in state.model.joints}
+    explicit_skeleton = state.model.name in ("go2_description", "Aibo")
+    if explicit_skeleton:
+        for a, b in state.model.skeleton_segments(poses):
+            add_line(commands, state.camera, screen.get_size(), a, b, LINK_GRAY, 4)
+    # Preserve Pupper's existing four-mount outline.
+    outline_mounts = state.model.name == "pupper_v3" and bool(state.model.display_anchors)
+    if outline_mounts:
+        mounts = [state.model.joint_point(j, poses) for j in state.model.joints if j.parent == state.model.root]
+        mounts.sort(key=lambda p: math.atan2(p[1]-root_center[1], p[0]-root_center[0]))
+        for a, b in zip(mounts, mounts[1:]+mounts[:1]):
+            add_line(commands, state.camera, screen.get_size(), a, b, LINK_GRAY, 4)
+    for j in state.model.joints:
+        t = poses[j.child]
+        point = state.model.joint_point(j, poses)
+        parent_joint = incoming.get(j.parent)
+        anchor = state.model.joint_point(parent_joint, poses) if parent_joint else root_center
+        if not explicit_skeleton and (parent_joint or not outline_mounts):
+            add_line(commands, state.camera, screen.get_size(), anchor, point, LINK_GRAY, 4)
+        if j.kind != "fixed":
+            active = j.name == state.active_joint.name
+            color = seismic_torque_color(torque_rows[j.name].required_torque_nm, telemetry.largest_torque.required_torque_nm)
+            # Child frame makes colocated joints and leaf rotations visible.
+            for i, axis_color in enumerate(((205, 85, 85), (90, 182, 120), (88, 135, 220)) if state.show_bounds else ()):
+                add_line(commands, state.camera, screen.get_size(), point, point + t[:3, i] * .035, axis_color, 2)
+            if active and state.show_bounds:
+                axis = (poses[j.parent] @ j.transform)[:3, :3] @ j.axis
+                axis = axis / np.linalg.norm(axis) * .06
+                add_line(commands, state.camera, screen.get_size(), point-axis, point+axis, color, 3)
+    joint_groups = urdf_joint_groups(state.model, poses)
+    for group in joint_groups:
+        point = state.model.joint_point(group[0], poses)
+        # Outer-to-inner disks expose every coincident joint's torque color.
+        for index, joint in enumerate(group):
+            radius = 10 + 5 * (len(group) - index - 1)
+            color = seismic_torque_color(torque_rows[joint.name].required_torque_nm,
+                                         telemetry.largest_torque.required_torque_nm)
+            add_joint(commands, state.camera, screen.get_size(), point, radius + 1, (12, 15, 19), False)
+            add_joint(commands, state.camera, screen.get_size(), point, radius, color, False)
+    mass, com = telemetry.model.total_mass_kg, telemetry.model.com_m
+    add_joint(commands, state.camera, screen.get_size(), com, 7, (126, 235, 210))
+    if state.target is not None and viewer.show_stage3:
+        endpoint = urdf.effector_point(state.model, poses, state.effector) if state.effector else None
+        draw_reach_markers(commands, state.camera, screen.get_size(), com, state.target, state.reach_error, endpoint)
+    render_commands(screen, commands)
+    for group in joint_groups:
+        if len(group) > 1:
+            projected = project(state.model.joint_point(group[0], poses), state.camera, screen.get_size())
+            if projected is not None:
+                (x, y), _ = projected
+                label = small_font.render(f"{len(group)} DOF", True, (225, 230, 238), (12, 15, 19))
+                screen.blit(label, (x + 13 + 5 * (len(group) - 1), y - label.get_height() // 2))
+    margin = telemetry.worst_margin.max_margin
+    margin_text = "N/A" if margin is None else f"{margin:.2f}x"
+    lines = [
+        f"stage 1 mass/torque | {urdf.MODEL_LABELS[key]} | {'paused' if viewer.motion_paused else 'live'}",
+        f"mass {mass:.3f} kg | COM x {com[0]:+.3f} y {com[1]:+.3f} z {com[2]:+.3f} m",
+        f"URDF effort margin {margin_text} | {telemetry.worst_margin.joint}",
+        f"largest torque {telemetry.largest_torque.joint} {telemetry.largest_torque.required_torque_nm:.3f} Nm",
+        f"joint fill seismic scale 0..{telemetry.largest_torque.required_torque_nm:.3f} Nm global",
+        f"target residual {state.reach_error:.3f} m | {len(state.model.movable)} DOF / {len(joint_groups)} joint markers | URDF limits",
+        "URDF mass assumptions | no FEM, no gravity/contact",
+    ]
+    if state.solo:
+        lines.append(f"DOF solo {state.selected+1:02d}/{len(state.model.movable)} | {state.active_joint.name}")
+    help_lines = [
+        "left/right or A/D: selected joint    up/down: select joint",
+        "space: freeze motion",
+        "M: DOF solo    N: next solo DOF",
+        "B: joint motion    ,/.: motion speed",
+        "G: stage 3 command bars    R: random best-effector reach auto/manual",
+        "left-drag mouse: orbit camera    wheel: zoom",
+        "Y: material/torque overlay    V: mesh bounds    F: fit camera",
+        "1: Chihuahua    2: Go2    3: Aibo ERS-7    4: Pupper v3",
+        "P: screenshot    ?: help    Esc: quit",
+    ]
+    draw_status_panel(screen, font, small_font, viewer, lines, help_lines)
+    overlay = state.material_overlay
+    layout_material_overlay(overlay, screen.get_size(), None)
+    overlay.status = "all link masses scaled | Aibo source placeholders" if key == "aibo" else "all link masses scaled | URDF effort limit"
+    draw_material_overlay(screen, font, small_font, viewer, overlay, telemetry)
+    layout_stage3_overlay(state.command_overlay, screen.get_size(), [overlay.panel_rect] if viewer.show_materials else [])
+    ui = replace(viewer, joint_commands_deg=state.angles,
+                 stage3_target_m=state.target, stage3_active_effector=state.effector,
+                 stage3_target_error_m=state.reach_error)
+    draw_stage3_overlay(screen, font, small_font, ui, state.command_overlay,
+                        state.control_description, telemetry, values=state.angles,
+                        selected_keys=set(state.reach_commands) if viewer.stage3_auto_reach else set())
+
+
 def run_viewer(args: argparse.Namespace) -> None:
     if args.headless:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
     pygame.init()
-    pygame.display.set_caption("Stage 1 mass/torque linkage viewer")
+    pygame.display.set_caption(f"Mass/linkage viewer | {args.model}")
+    pygame.key.set_repeat(250, 35)
     screen = pygame.display.set_mode((args.width, args.height))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Menlo,Consolas,monospace", 24)
@@ -1851,6 +2203,11 @@ def run_viewer(args: argparse.Namespace) -> None:
         stage3_arbitration_period_s=args.stage3_arbitration_period_s,
     )
     initialize_joint_commands(viewer, description, args.waist, args.waist_pitch)
+    selected_model = args.model
+    urdf_states = {key: create_urdf_viewer(key, args) for key in urdf.MODEL_PATHS}
+    chihuahua_camera = viewer.camera
+    if selected_model != "chihuahua":
+        viewer.camera = urdf_states[selected_model].camera
     rng = np.random.default_rng(args.stage3_seed)
     dragging = False
     last_mouse = (0, 0)
@@ -1876,69 +2233,94 @@ def run_viewer(args: argparse.Namespace) -> None:
         layout_stage3_overlay(stage3_overlay, screen.get_size(), occupied)
 
         for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
+                selected_model = {pygame.K_1: "chihuahua", pygame.K_2: "go2", pygame.K_3: "aibo", pygame.K_4: "pupper"}[event.key]
+                viewer.camera = chihuahua_camera if selected_model == "chihuahua" else urdf_states[selected_model].camera
+                dragging = False
+                tuning_overlay.active_index = None
+                material_overlay.active_index = None
+                stage3_overlay.active_key = None
+                for state in urdf_states.values():
+                    state.material_overlay.active_index = None
+                    state.command_overlay.active_key = None
+                pygame.display.set_caption(f"Mass/linkage viewer | {selected_model}")
+                continue
+            external = urdf_states.get(selected_model)
+            if external is not None and handle_material_overlay_event(event, viewer, external.material_overlay):
+                continue
+            if external is not None and handle_urdf_mouse(event, external, viewer):
+                if event.type == pygame.MOUSEBUTTONUP:
+                    dragging = False
+                continue
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
-                    screenshot_path = args.out_dir / "pygame_mass_viewer_screenshot.png"
+                    screenshot_path = args.out_dir / f"pygame_mass_viewer_{selected_model}.png"
                 else:
-                    running = handle_key(event, viewer, description)
+                    running = handle_urdf_key(event, viewer, external) if external is not None else handle_key(event, viewer, description)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if handle_material_overlay_event(event, viewer, material_overlay):
+                if external is None and handle_material_overlay_event(event, viewer, material_overlay):
                     continue
-                if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
+                if external is None and handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
-                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
+                if external is None and handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
                     continue
                 if event.button == 1:
                     dragging = True
                     last_mouse = event.pos
                 elif event.button == 4:
-                    viewer.camera.distance = max(0.75, viewer.camera.distance * 0.92)
+                    viewer.camera.distance = max(0.15, viewer.camera.distance * 0.92)
                 elif event.button == 5:
-                    viewer.camera.distance = min(3.00, viewer.camera.distance * 1.08)
+                    viewer.camera.distance = min(10.00, viewer.camera.distance * 1.08)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if handle_material_overlay_event(event, viewer, material_overlay):
+                if external is None and handle_material_overlay_event(event, viewer, material_overlay):
                     continue
-                if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
+                if external is None and handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
-                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
+                if external is None and handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
                     continue
                 dragging = False
             elif event.type == pygame.MOUSEMOTION and dragging:
-                if handle_material_overlay_event(event, viewer, material_overlay):
+                if external is None and handle_material_overlay_event(event, viewer, material_overlay):
                     continue
-                if handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
+                if external is None and handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config):
                     continue
-                if handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
+                if external is None and handle_stage3_overlay_event(event, viewer, stage3_overlay, description):
                     continue
                 dx = event.pos[0] - last_mouse[0]
                 dy = event.pos[1] - last_mouse[1]
                 viewer.camera.yaw = wrap_angle(viewer.camera.yaw - dx * 0.008)
                 viewer.camera.pitch = wrap_angle(viewer.camera.pitch - dy * 0.006)
                 last_mouse = event.pos
-            elif event.type == pygame.MOUSEMOTION:
+            elif event.type == pygame.MOUSEMOTION and external is None:
                 handle_material_overlay_event(event, viewer, material_overlay)
                 handle_tuning_overlay_event(event, viewer, tuning_overlay, description, args.config)
                 handle_stage3_overlay_event(event, viewer, stage3_overlay, description)
 
-        update_autoplay(viewer, description)
-        set_joint_command_deg(viewer, description, "waist_yaw", joint_command_deg(viewer, description, "waist_yaw"))
-        set_joint_command_deg(viewer, description, "waist_pitch", joint_command_deg(viewer, description, "waist_pitch"))
+        external = urdf_states.get(selected_model)
+        if external is not None:
+            update_urdf_motion(external, dt, viewer.motion_paused)
+            update_urdf_reach(external, viewer, rng, dt)
+            draw_urdf_viewer(screen, font, small_font, viewer, external, selected_model)
+        else:
+            update_autoplay(viewer, description)
+            set_joint_command_deg(viewer, description, "waist_yaw", joint_command_deg(viewer, description, "waist_yaw"))
+            set_joint_command_deg(viewer, description, "waist_pitch", joint_command_deg(viewer, description, "waist_pitch"))
 
-        screen.fill((12, 15, 19))
-        live_catalog = live_catalog_with_material_overlay(base_catalog, material_overlay)
-        telemetry = make_stage1_telemetry(description, viewer, live_catalog)
-        if update_stage3_reach_target(viewer, description, telemetry, rng, dt):
+            screen.fill((12, 15, 19))
+            live_catalog = live_catalog_with_material_overlay(base_catalog, material_overlay)
             telemetry = make_stage1_telemetry(description, viewer, live_catalog)
-        commands, metrics = make_scene_commands(viewer, telemetry, screen.get_size())
-        add_stage1_markers(commands, viewer, telemetry, screen.get_size())
-        add_stage3_target_markers(commands, viewer, telemetry, screen.get_size())
-        render_commands(screen, commands)
-        draw_text_panel(screen, font, small_font, viewer, metrics, telemetry, clock.get_fps())
-        draw_tuning_overlay(screen, font, small_font, viewer, tuning_overlay, description)
-        draw_material_overlay(screen, font, small_font, viewer, material_overlay, telemetry)
-        draw_stage3_overlay(screen, font, small_font, viewer, stage3_overlay, description, telemetry)
+            if update_stage3_reach_target(viewer, description, telemetry, rng, dt):
+                telemetry = make_stage1_telemetry(description, viewer, live_catalog)
+            commands, metrics = make_scene_commands(viewer, telemetry, screen.get_size())
+            add_stage1_markers(commands, viewer, telemetry, screen.get_size())
+            add_stage3_target_markers(commands, viewer, telemetry, screen.get_size())
+            render_commands(screen, commands)
+            draw_text_panel(screen, font, small_font, viewer, metrics, telemetry, clock.get_fps())
+            draw_tuning_overlay(screen, font, small_font, viewer, tuning_overlay, description)
+            draw_material_overlay(screen, font, small_font, viewer, material_overlay, telemetry)
+            draw_stage3_overlay(screen, font, small_font, viewer, stage3_overlay, description, telemetry)
         pygame.display.flip()
 
         if screenshot_path is not None:
@@ -1954,15 +2336,16 @@ def run_viewer(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", choices=("chihuahua", "go2", "aibo", "pupper"), default="chihuahua")
     parser.add_argument("--width", type=int, default=1920)
     parser.add_argument("--height", type=int, default=1440)
     parser.add_argument("--waist", type=float, default=24.0)
     parser.add_argument("--waist-pitch", type=float, default=0.0)
     parser.add_argument("--paused", action="store_true", help="start with motion frozen")
-    parser.add_argument("--no-babble", action="store_true", help="freeze constrained joint babble")
-    parser.add_argument("--dof-solo", action="store_true", help="animate one of the 21 DOFs at a time")
+    parser.add_argument("--no-babble", action="store_true", help="disable automatic joint motion")
+    parser.add_argument("--dof-solo", action="store_true", help="animate one DOF of the selected model at a time")
     parser.add_argument("--dof-index", type=int, default=0, help="zero-based DOF index for --dof-solo")
-    parser.add_argument("--babble-scale", type=float, default=1.0, help="scale for joint oscillation")
+    parser.add_argument("--babble-scale", type=float, default=1.0, help="scale for Chihuahua oscillation / URDF rotation speed")
     parser.add_argument("--no-stage3-overlay", action="store_true", help="hide Stage 3 joint command bars")
     parser.add_argument("--no-stage3-reach", action="store_true", help="disable random head-claw target reach")
     parser.add_argument("--stage3-target-radius-min-m", type=float, default=0.18)

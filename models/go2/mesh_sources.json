@@ -1,0 +1,41 @@
+{
+  "repository": "unitreerobotics/unitree_ros",
+  "revision": "3ae893d905d11795ddf1075825ee5010364a1109",
+  "meshes": {
+    "package://go2_description/dae/base.dae": {
+      "file": "source_meshes/dae/base.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/base.dae",
+      "sha256": "e52bebbb5c7ff1f6aedee620c9b5b349f6e965360ecc63a9bb743eeff2d0be64"
+    },
+    "package://go2_description/dae/calf.dae": {
+      "file": "source_meshes/dae/calf.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/calf.dae",
+      "sha256": "29872fa1a435b92bc2b395fdfa7f0aee26101db3c494681896bd4ef24ee7883c"
+    },
+    "package://go2_description/dae/calf_mirror.dae": {
+      "file": "source_meshes/dae/calf_mirror.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/calf_mirror.dae",
+      "sha256": "79c66be7ed06760bd5001c067a1fb0ac517f639d8b1a5f89be471903b3f359e1"
+    },
+    "package://go2_description/dae/foot.dae": {
+      "file": "source_meshes/dae/foot.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/foot.dae",
+      "sha256": "ffbd95fd641866ce9bd277aa249b92dafc9148d70131fa2c52709a35ce5b710b"
+    },
+    "package://go2_description/dae/hip.dae": {
+      "file": "source_meshes/dae/hip.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/hip.dae",
+      "sha256": "8735e10617afe252cef0844c1d139d15bc6d4c653660d742fea9fe05c2704d8f"
+    },
+    "package://go2_description/dae/thigh.dae": {
+      "file": "source_meshes/dae/thigh.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/thigh.dae",
+      "sha256": "a622381ae308897ff143b8bbf02f075457c342b22984205040424a5a983246fa"
+    },
+    "package://go2_description/dae/thigh_mirror.dae": {
+      "file": "source_meshes/dae/thigh_mirror.dae",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/3ae893d905d11795ddf1075825ee5010364a1109/robots/go2_description/dae/thigh_mirror.dae",
+      "sha256": "c7bae0b0565c2aa4b7cc15a538d795e9153e0f10c821cc18429e92693172bdc6"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "file": "ri20-kv600-frameless-torque-motor-without-hall-sensor-2d-drawing-cn.pdf",
+    "url": "https://www.cubemars.com/data/cms/202608/ri20-kv600-frameless-torque-motor-without-hall-sensor-2d-drawing-cn.pdf",
+    "sha256": "c02089ec6695a8731b9c22f2ec8a5967a16dad6568342a91d411cf65aa2b1ba7"
+  },
+  {
+    "file": "ri20-kv600-frameless-torque-motor-without-hall-sensor-3d-drawing.zip",
+    "url": "https://www.cubemars.com/data/cms/202608/ri20-kv600-frameless-torque-motor-without-hall-sensor-3d-drawing.zip",
+    "sha256": "dd8172da541a52b79e7e199f18ae335ec67592806b18decef2116796e16546d2"
+  },
+  {
+    "file": "ri30-kv260-frameless-torque-motor-without-hall-sensor-2d-drawing.pdf",
+    "url": "https://www.cubemars.com/data/cms/202608/ri30-kv260-frameless-torque-motor-without-hall-sensor-2d-drawing.pdf",
+    "sha256": "3203e317776a584a16878be98e06a6b8e2119ce295c3ddabcfb9c06637e27839"
+  },
+  {
+    "file": "ri30-kv260-frameless-torque-motor-without-hall-sensor-3d-drawing.zip",
+    "url": "https://www.cubemars.com/data/cms/202608/ri30-kv260-frameless-torque-motor-without-hall-sensor-3d-drawing.zip",
+    "sha256": "ffcf77872307a5c95c782b8d7a1327c22e3f700876d9681a5a45825f27e76662"
+  },
+  {
+    "file": "ri20/RI20 3D Drawing.STEP",
+    "source_archive": "ri20 ZIP",
+    "sha256": "e27fb9a59fe738ce3d1cbe2a2f2d5e497aa4fd10c327c7f92038cd532aa9de42"
+  },
+  {
+    "file": "ri30/RI30 3D Drawing.STEP",
+    "source_archive": "ri30 ZIP",
+    "sha256": "6f384c270c043b847bc0db289e226749a179c8af634fdbb0afdf995e4c777264"
+  }
+]

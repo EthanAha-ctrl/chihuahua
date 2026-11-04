@@ -73,13 +73,38 @@ life context -> embodied behavior -> social learning -> survival adaptation
 
 
 
-| 厂商／型号（官方链接）                                                                                                 | 重量    | 额定／持续扭矩 | 峰值／最大扭矩      | 减速比        | 驱动器   | 与 AKE 的可比性／采购状态                                                                                   |
+## 供应商执行器候选清单
+
+SteadyWin／DAMIAO 候选资料核对日期：2026-11-03。列入清单表示进入选型比较，尚未完成整机重量与动态性能验证。
+
+| 厂商／型号（厂家／资料链接）                                                                                                 | 重量    | 额定／持续扭矩 | 峰值／最大扭矩      | 减速比        | 驱动器   | 与 AKE 的可比性／采购状态                                                                                   |
 | ----------------------------------------------------------------------------------------------------------- | ----- | ------- | ------------ | ---------- | ----- | ------------------------------------------------------------------------------------------------- |
 | **CubeMars AKE40-6**（基准）                                                                                    | 140 g | 1.8 N·m | 5.5 N·m      | 6:1        | 外配    | 厂标 QDD；[官方参数对比表](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html) |
 | **[CubeMars AKE50-8](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html)**（基准） | 190 g | 2.5 N·m | 7.5 N·m      | 8:1        | 外配    | 厂标 QDD；官网可下单                                                                                      |
 | **[CubeMars AKE60-8](https://www.cubemars.com/product/ake60-8-kv80-quasi-direct-drive-actuator.html)**（基准）  | 260 g | 5 N·m   | 12.5 N·m     | 8:1        | 外配    | 厂标 QDD；官网可下单                                                                                      |
 | **[Unitree GO-M8010-6](https://www.unitree.com/cn/go1/motor/)**                                             | 530 g | 5 N·m   | **23.7 N·m** | **6.33:1** | 内置    | 低减速比腿足执行器；明显更重、扭矩更大；[官方购买](https://shop.unitree.com/products/go1-motor)                           |
 | **[酷卓 CODROID CoDrive PA60](https://www.codroid.ai/download/huace/part-pa.pdf)**                            | 400 g | 3 N·m   | **9 N·m**²   | **6:1**    | 目录未说明 | 厂标准直驱；较 AKE50／60 更重；未核实直接下单渠道                                                                     |
+| **[SteadyWin GIM3505-8 V1.1](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module)** | 裸机 84 g／含驱动 97 g | 0.65／0.67 N·m | 1.27／1.79 N·m | 8:1 行星 | 可配 GDS34／GDZ34 | 优先单关节台架候选；同格双数值按 GDS34／GDZ34 顺序；价格与现货未核实 |
+| **[SteadyWin GIM4305-10 V1.1](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module-2)** | 裸机 140 g／含驱动 150 g | 1.00／1.05 N·m | 3.47／3.82 N·m | 10:1 行星 | 可配 GDS34／GDZ34 | 同格双数值按 GDS34／GDZ34 顺序；Pupper 驱动版本另行确认；价格与现货未核实 |
+| **[DAMIAO DM-J3507-2EC（24 V）](https://www.mdmbot.com/index.php?c=show&id=118)** | 约 150 g，含驱动 | 0.8 N·m | 3 N·m | 7:1，结构类型待确认 | 内置 | 双编码器、输出轴单圈绝对位置；具体硬件版本、价格与现货待采购确认 |
+
+### 新增候选的版本与尺寸
+
+下表尺寸为直径 × 轴向高度，转速为减速器输出端。SteadyWin 的 V1.1 可装驱动板；V1.0 的编码器配置不能直接套用含驱动参数。
+
+| 配置 | 裸机尺寸（mm） | 含驱动尺寸（mm） | 额定输出转速（rpm） | 最高输出转速（rpm） | 反馈与通信 |
+| --- | --- | --- | ---: | ---: | --- |
+| GIM3505-8＋GDS34 | Ø43×23.6 | Ø43×30 | 225 | 384 | 14-bit；CAN |
+| GIM3505-8＋GDZ34 | Ø43×23.6 | Ø43×28.8 | 230 | 400 | 14-bit；CAN／RS485 |
+| GIM4305-10＋GDS34 | Ø53×26 | Ø53×32 | 300 | 366 | 14-bit；CAN |
+| GIM4305-10＋GDZ34 | Ø53×26 | Ø53×32 | 312 | 402 | 14-bit；CAN／RS485 |
+| DM-J3507-2EC（24 V） | 未单列 | Ø46×37.9 | 150 | 460（空载） | 双编码器；当前官网注明 CAN／CAN FD，最高 5 Mbps，需核对硬件版本 |
+
+- SteadyWin 两型号标称背隙均为 15 arcmin；原始选型表的 `Secondary Encoder Support (on the output shaft)` 均为 NO。`Stand-alone Encoder Support` 为 YES，表示独立编码器配置，不应据此记录为支持输出轴第二编码器。DM-J3507-2EC 的背隙与各型号实测回驱阻力仍待确认。
+- SteadyWin 原始 XLSX 使用 `Peak Torque` 字段，部分旧资料使用堵转扭矩；本清单保留来源口径。峰值持续时间、起跳转速下可用扭矩及 5 s 工作能力尚未验证，不能直接按峰值扭矩／重量确定跳跃选型。
+- 质量检查：16 个含驱动 GIM3505 为 1,552 g；8 个为 776 g，距 1.5 kg 整机目标余 724 g，仍需容纳另外 8 轴、骨架、绳路、电池和计算单元。16 个含驱动 GIM4305 或 DM-J3507 为约 2,400 g。
+
+来源：[SteadyWin GDS 原始选型表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/64b38c1d/Planetary-Reduction-Motor-Selection-Table-GDS-Driver.xlsx)、[GDZ 原始选型表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/1594c9b8/Planetary-Reduction-Motor-Selection-Table-GDZ-Driver.xlsx)，由厂家参与运营的 [SteadyWin 销售站](https://steadywin-motor.com/pages/about-us) 产品页提供；[DAMIAO 产品页](https://www.mdmbot.com/index.php?c=show&id=118)与[厂家 2025 产品选型手册](https://www.worldrobotconference.com/profile/robot/download/2025/06/30/%E8%BE%BE%E5%A6%99%E7%A7%91%E6%8A%80DAMIAO%20-%202025%E5%B9%B4%E4%BA%A7%E5%93%81%E9%80%89%E5%9E%8B%E6%89%8B%E5%86%8C_20250630192546A441.pdf)。[Stanford 项目仓库](https://github.com/stanfordroboticsclub/StanfordQuadruped)确认 Pupper v3 使用 GIM4305 系列，具体驱动配置需按项目版本核对。
 
 
 mechanical tendon stop + 凹轮
@@ -116,3 +141,11 @@ Sources:
 - [Pupper V3 specs](https://pupper-v3-documentation.readthedocs.io/en/latest/learn_more/tech_specs.html)
 - [DM-J3507-2EC（aifitlab）](https://aifitlab.com/products/damiao-dm-j3507-2ec-motor)
 - [DM-J3507-2EC（roboticscenter）](https://www.roboticscenter.ai/ar/store/product/damiao-dm-j3507-2ec)
+
+
+## 模型对比 viewer
+
+`uv run python pygame_mass_viewer.py --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
+窗口内按 `1/2/3/4` 切换 Chihuahua / Go2 / Aibo ERS-7 / Pupper v3；Go2 和 Aibo 保留 URDF 拓扑，关节角度遵守 URDF 限位。
+`B` 全身转动，`M` 单关节，`N` 或 `[/]` 选关节，左右键或横拖关节行调角；`空格` 暂停，`0` 零姿态，`F` 居中，`V` 切换 mesh 包围盒。
+模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](models/README.md)。

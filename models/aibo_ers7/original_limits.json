@@ -1,0 +1,74 @@
+{
+  "source": "Original imported Aibo URDF, preserved Git index blob e0e9c4d25fdb5bbbd6e8cb34dd7bf417126e77c7",
+  "correction": "headPan lower/upper were reversed in source. Preserve magnitude 1.5882 rad and order the endpoints.",
+  "limits_rad": {
+    "legRF1": {
+      "lower": -2.09,
+      "upper": 2.36
+    },
+    "legRF2": {
+      "lower": -1.58825,
+      "upper": 0.15708
+    },
+    "legRF3": {
+      "lower": -0.506,
+      "upper": 2.0768
+    },
+    "legLF1": {
+      "lower": -2.094,
+      "upper": 2.36
+    },
+    "legLF2": {
+      "lower": -0.15708,
+      "upper": 1.58825
+    },
+    "legLF3": {
+      "lower": -0.506,
+      "upper": 2.0768
+    },
+    "legRB1": {
+      "lower": -2.3387,
+      "upper": 2.094
+    },
+    "legRB2": {
+      "lower": -0.15708,
+      "upper": 1.58825
+    },
+    "legRB3": {
+      "lower": -0.506,
+      "upper": 2.0768
+    },
+    "legLB1": {
+      "lower": -2.094,
+      "upper": 2.3387
+    },
+    "legLB2": {
+      "lower": -0.15708,
+      "upper": 1.58825
+    },
+    "legLB3": {
+      "lower": -0.506,
+      "upper": 2.0768
+    },
+    "neck": {
+      "lower": -1.3788,
+      "upper": 0.0349
+    },
+    "headPan": {
+      "lower": -1.5882,
+      "upper": 1.5882
+    },
+    "headTilt": {
+      "lower": -0.28,
+      "upper": 0.77
+    },
+    "tailTilt": {
+      "lower": 0.03,
+      "upper": 1.1
+    },
+    "tailPan": {
+      "lower": -1.03,
+      "upper": 1.03
+    }
+  }
+}

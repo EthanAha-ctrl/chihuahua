@@ -1,0 +1,114 @@
+<div id="ri-assembly-viewer">
+  <h2>电机 → 绕线器 → 木腿关节</h2>
+  <div class="viz-controls ri-top">
+    <label class="form-label">装配视图<select class="form-select" id="ri-view"><option value="drive">完整单轴与绳路</option><option value="ri30">RI30 电机模组</option><option value="ri20">RI20 电机模组</option><option value="joint">木腿与双槽关节</option><option value="abduction">外展绳驱与摇架</option></select></label>
+    <label class="form-label">装配阶段<select class="form-select" id="ri-stage"><option value="99">全部零件</option><option value="1">1 · 固定座与后端盖</option><option value="2">2 · 后轴承与定子</option><option value="3">3 · 转子毂、轴与隔套</option><option value="4">4 · 前轴承与桥盖</option><option value="5">5 · 绳端夹紧与预紧</option><option value="6">6 · 编码器与校零</option></select></label>
+  </div>
+  <div class="ri-scene" id="ri-scene" role="img" aria-label="真实 CAD 实体装配，可拖动旋转、滚轮缩放和点击零件；支持爆炸展开和单件查看。"><div id="ri-loading" role="status">正在读取 CAD 实体…</div><div id="ri-axis-label" class="text-small">单位 mm · CAD 评审模型</div></div>
+  <div class="viz-controls">
+    <button class="btn" type="button" id="ri-iso">立体视角</button><button class="btn" type="button" id="ri-front">正视</button><button class="btn" type="button" id="ri-side">侧视</button><button class="btn" type="button" id="ri-focus">放大所选零件</button>
+  </div>
+  <div class="ri-explode-row"><label for="ri-explode" class="form-label">爆炸展开 <span id="ri-explode-value" class="tabular-nums">0%</span></label><input class="form-range" id="ri-explode" type="range" min="0" max="100" value="0" aria-label="爆炸展开百分比"></div>
+  <div class="viz-controls">
+    <label class="form-check"><input class="form-check-input" id="ri-xray" type="checkbox" checked><span class="form-check-label">透视外壳与定子</span></label>
+    <label class="form-check"><input class="form-check-input" id="ri-spring" type="checkbox" checked><span class="form-check-label">可选并联扭簧</span></label>
+    <label class="form-check"><input class="form-check-input" id="ri-isolate" type="checkbox"><span class="form-check-label">只看所选零件</span></label>
+  </div>
+  <label class="form-label ri-pick">零件清单<select class="form-select" id="ri-part"><option value="">选择或点击实体</option></select></label>
+  <div id="ri-detail" class="text-small" aria-live="polite">官方 STEP 电机 + 自定义机械件；螺纹、配合与强度未定版。</div>
+  <div class="ri-legend text-small"><span><i style="background:#b77d55"></i>原厂定子</span><span><i style="background:#39485a"></i>原厂转子</span><span><i style="background:#2382d0"></i>A 绳</span><span><i style="background:#ed8b30"></i>B 绳</span><span><i style="background:#d5aa6c"></i>木材</span><span><i style="background:#9b66c6"></i>可选弹簧</span></div>
+  <div id="ri-error" role="alert" hidden></div>
+</div>
+<style>
+#ri-assembly-viewer{--background:#fff;--foreground:#202c39;--card:#fff;--card-foreground:#202c39;--muted:#edf1f4;--muted-foreground:#596575;--border:#d5dce3;--primary:#273d55;--primary-foreground:#fff;--input:#c7d1db;--accent:#eaf0f5;--accent-foreground:#202c39;background:var(--background);color:var(--foreground);color-scheme:light;display:flex;flex-direction:column;gap:calc(var(--font-size-base)*.7);padding:calc(var(--font-size-base)*.5)}
+#ri-assembly-viewer .ri-scene{position:relative;width:100%;height:500px;touch-action:none;overflow:hidden;background:#f6f8fa}
+#ri-assembly-viewer .ri-scene canvas{display:block;width:100%;height:100%;touch-action:none}
+#ri-assembly-viewer #ri-loading{position:absolute;inset:45% 0 auto;text-align:center}
+#ri-assembly-viewer #ri-axis-label{position:absolute;bottom:8px;left:10px;pointer-events:none;color:#596575}
+#ri-assembly-viewer .ri-explode-row{display:flex;align-items:center;gap:1em}
+#ri-assembly-viewer .ri-explode-row label{white-space:nowrap}
+#ri-assembly-viewer .ri-explode-row input{flex:1;min-width:0}
+#ri-assembly-viewer .ri-top>label{flex:1;min-width:210px}
+#ri-assembly-viewer .ri-pick{display:flex;flex-direction:column;gap:.3em}
+#ri-assembly-viewer .ri-legend{display:flex;flex-wrap:wrap;gap:.5em 1.1em}
+#ri-assembly-viewer .ri-legend span{display:flex;align-items:center;gap:.35em}
+#ri-assembly-viewer .ri-legend i{width:10px;height:10px;display:inline-block;border-radius:50%}
+#ri-assembly-viewer #ri-detail{min-height:2.7em;overflow-wrap:anywhere}
+#ri-assembly-viewer #ri-error{color:#a21c20;background:#fff0ef;padding:1em;overflow-wrap:anywhere}
+@media(max-width:500px){#ri-assembly-viewer .ri-scene{height:410px}#ri-assembly-viewer .ri-top>label{min-width:100%}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js" onerror="document.getElementById('ri-error').hidden=false;document.getElementById('ri-error').textContent='三维引擎加载失败。未显示替代示意图；请使用交付的 STEP 文件检查。'"></script>
+<script>
+(async function(){
+const root=document.getElementById('ri-assembly-viewer'),$=id=>root.querySelector('#'+id),state={view:'drive',explode:0,part:'',xray:true,spring:true,isolate:false,stage:99};
+const fatal=err=>{$('ri-error').hidden=false;$('ri-error').textContent='CAD 显示失败：'+(err.message||String(err));$('ri-loading').textContent='加载已停止';console.error(err);};
+try{
+if(!window.THREE)throw new Error('Three.js 未能加载');
+if(!window.DecompressionStream)throw new Error('浏览器缺少 DecompressionStream，无法读取几何');
+const packed='%%DATA%%';
+const bytes=Uint8Array.from(atob(packed),c=>c.charCodeAt(0));
+const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();let chunks=[],size=0;
+while(true){const r=await reader.read();if(r.done)break;chunks.push(r.value);size+=r.value.length;}
+const raw=new Uint8Array(size);let offset=0;for(const c of chunks){raw.set(c,offset);offset+=c.length;}
+const data=JSON.parse(new TextDecoder().decode(raw));
+const scene=new THREE.Scene();scene.background=new THREE.Color('#f6f8fa');
+scene.add(new THREE.HemisphereLight(0xffffff,0x74849a,2.2));
+const keyLight=new THREE.DirectionalLight(0xffffff,2.3);keyLight.position.set(150,240,300);scene.add(keyLight);
+const fill=new THREE.DirectionalLight(0xffffff,.9);fill.position.set(-200,-80,-130);scene.add(fill);
+const canvas=$('ri-scene'),renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor('#f6f8fa');canvas.appendChild(renderer.domElement);
+const camera=new THREE.OrthographicCamera(-100,100,100,-100,.1,4000),world=new THREE.Group();scene.add(world);
+const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
+let meshes=[],labels=[],yaw=.52,pitch=.28,zoom=1,center=new THREE.Vector3(),radius=100,drag=null,moved=false;
+const geoms=new Map();for(const p of data){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p.vertices.map(v=>v*p.scale),3));g.setIndex(p.triangles);g.computeVertexNormals();geoms.set(p.key,g);}
+function addPart(p,translation=[0,0,0],rotation=0,tag=''){
+ const material=new THREE.MeshStandardMaterial({color:p.color,metalness:p.group==='joint'&&p.key.includes('wood')?.02:.32,roughness:.47,side:THREE.DoubleSide});
+ const mesh=new THREE.Mesh(geoms.get(p.key),material);mesh.userData={p,id:tag+p.key,translation,rotation};mesh.rotation.y=rotation;mesh.position.fromArray(translation);world.add(mesh);meshes.push(mesh);
+}
+function addGroup(group,translation=[0,0,0],rotation=0,tag=''){for(const p of data.filter(p=>p.group===group)){if((state.view==='drive'||(state.view==='abduction'&&group==='ri20'))&&p.localCord)continue;addPart(p,translation,rotation,tag);}}
+const groupTitle={drive:'单轴连接 · Ø6／Ø48 绳轮 · 65 mm 关节中心距',ri30:'RI30 · 裸电机 Ø38 × 14 mm · 总成 45 × 47.5 × 52.9 mm',ri20:'RI20 · 裸电机 Ø25 × 14.5 mm · 总成 32 × 33 × 52.9 mm',joint:'木腿关节 · 双槽节径 Ø48 mm · 两槽间距 6 mm',abduction:'外展 · RI20 固定 · 三个 RI30 随摇架转动 · 空间评审'};
+function restore(value){const s=value&&value.modelContent;if(!s||s.design!=='RI实体装配')return;for(const k of ['view','explode','part','xray','spring','isolate','stage'])if(s[k]!==undefined)state[k]=s[k];if(!groupTitle[state.view])state.view='drive';state.explode=Math.max(0,Math.min(100,Number(state.explode)||0));}
+function save(){if(window.openai&&typeof window.openai.setWidgetState==='function')window.openai.setWidgetState({modelContent:{design:'RI实体装配',...state}}).catch(e=>fatal(new Error('交互状态保存失败：'+e.message)));}
+function sync(){for(const [key,id] of [['view','ri-view'],['explode','ri-explode'],['stage','ri-stage']])$(id).value=state[key];for(const [key,id]of[['xray','ri-xray'],['spring','ri-spring'],['isolate','ri-isolate']])$(id).checked=state[key];$('ri-explode-value').textContent=state.explode+'%';}
+function build(){
+ for(const m of meshes){world.remove(m);m.material.dispose();}meshes=[];
+ if(state.view==='drive'){addGroup('ri30',[0,90,-19.7]);addGroup('joint');addGroup('drive');}
+ else if(state.view==='abduction'){addGroup('abduction');addGroup('ri20',[60,0,0],0,'fixed_');for(const [i,v]of [[-60,-25,-14.4],[-60,25,-14.4],[-60,0,28.9]].entries())addGroup('ri30',v,Math.PI/2,'cradle'+i+'_');}
+ else addGroup(state.view);
+ $('ri-part').replaceChildren(new Option('选择或点击实体',''));for(const m of meshes){const p=m.userData.p;let name=p.name;if(m.userData.id.startsWith('cradle'))name='摇架电机 '+(Number(m.userData.id[6])+1)+' · '+name;$('ri-part').appendChild(new Option(name,m.userData.id));}
+ if(!meshes.some(m=>m.userData.id===state.part))state.part='';$('ri-part').value=state.part;
+ $('ri-stage').disabled=!['drive','ri20','ri30'].includes(state.view);$('ri-axis-label').textContent=groupTitle[state.view];update(true);
+}
+function update(fit=false){
+ const amount=state.explode/100;
+ for(const m of meshes){const {p,id,translation,rotation}=m.userData;const e=new THREE.Vector3(...p.explode).multiplyScalar(amount*1.6).applyAxisAngle(new THREE.Vector3(0,1,0),rotation);m.position.fromArray(translation).add(e);
+  const staged=['ri20','ri30'].includes(p.group)&&p.stage>state.stage;
+  m.visible=!(p.optional&&!state.spring)&&!staged&&!(state.isolate&&state.part&&id!==state.part);
+  const isStator=p.source==='官方 STEP'&&p.name.includes('定子');const translucent=state.xray&&(p.shell||isStator||p.key.includes('fork'));
+  m.material.transparent=translucent;m.material.opacity=translucent?.16:1;m.material.depthWrite=!translucent;
+  m.material.emissive.set(id===state.part?'#886327':'#000000');m.material.emissiveIntensity=id===state.part?.45:0;
+ }
+ $('ri-explode-value').textContent=state.explode+'%';
+ const selected=meshes.find(m=>m.userData.id===state.part);$('ri-detail').textContent=selected?selected.userData.p.name+' · '+selected.userData.p.source+' · '+selected.userData.p.description:'官方 STEP 电机 + 自定义机械件；螺纹、配合与强度未定版。';
+ if(fit){const b=new THREE.Box3();for(const m of meshes)if(m.visible)b.expandByObject(m);if(!b.isEmpty()){b.getCenter(center);radius=b.getSize(new THREE.Vector3()).length()/2;zoom=1;}}draw();
+}
+function draw(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);const aspect=w/h,half=Math.max(10,radius*1.03)/zoom;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.position.copy(center).add(new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(1000));camera.up.set(0,1,0);camera.lookAt(center);camera.updateProjectionMatrix();renderer.render(scene,camera);}
+function select(id){state.part=id;$('ri-part').value=id;update();save();}
+renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw,pitch};moved=false;renderer.domElement.setPointerCapture(e.pointerId);});
+renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;yaw=drag.yaw-dx*.009;pitch=Math.max(-1.4,Math.min(1.4,drag.pitch+dy*.009));draw();});
+renderer.domElement.addEventListener('pointerup',e=>{if(!moved){const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hits=ray.intersectObjects(meshes.filter(m=>m.visible));const solid=hits.find(h=>h.object.material.opacity>.5)||hits[0];if(solid)select(solid.object.userData.id);}drag=null;});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.45,Math.min(12,zoom*Math.exp(-e.deltaY*.0012)));draw();},{passive:false});
+renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fatal(new Error('WebGL 上下文丢失，显示已停止'));});
+ $('ri-view').addEventListener('change',e=>{state.view=e.target.value;state.part='';state.stage=99;state.isolate=false;state.explode=0;yaw=['ri20','ri30'].includes(state.view)?1.05:.52;pitch=.28;sync();build();save();});
+ $('ri-stage').addEventListener('change',e=>{state.stage=Number(e.target.value);update(true);save();});
+ $('ri-explode').addEventListener('input',e=>{state.explode=Number(e.target.value);update(true);});$('ri-explode').addEventListener('change',save);
+ for(const [key,id]of[['xray','ri-xray'],['spring','ri-spring'],['isolate','ri-isolate']])$(id).addEventListener('change',e=>{state[key]=e.target.checked;update(key==='isolate');save();});
+ $('ri-part').addEventListener('change',e=>select(e.target.value));
+ $('ri-iso').addEventListener('click',()=>{yaw=.52;pitch=.28;update(true);});$('ri-front').addEventListener('click',()=>{yaw=0;pitch=0;update(true);});$('ri-side').addEventListener('click',()=>{yaw=Math.PI/2;pitch=.08;update(true);});
+ $('ri-focus').addEventListener('click',()=>{const m=meshes.find(m=>m.userData.id===state.part);if(!m)return;const b=new THREE.Box3().setFromObject(m);b.getCenter(center);radius=b.getSize(new THREE.Vector3()).length()/2;zoom=1.1;draw();});
+ restore(window.openai&&window.openai.widgetState);sync();build();$('ri-loading').hidden=true;new ResizeObserver(draw).observe(canvas);
+ window.addEventListener('openai:set_globals',e=>{if(e.detail&&e.detail.globals&&e.detail.globals.widgetState){restore(e.detail.globals.widgetState);sync();build();}});
+ window.addEventListener('error',e=>fatal(new Error(e.message)));
+}catch(e){fatal(e);}
+})();
+</script>

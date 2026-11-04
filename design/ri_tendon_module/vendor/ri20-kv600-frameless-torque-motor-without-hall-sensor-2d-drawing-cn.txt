@@ -1,0 +1,48 @@
+版本   日期            更新内容
+
+
+
+
+                                                                                                                                 A-A
+               A
+
+
+                          25 +-0.04
+                               0.02
+
+
+
+
+                                                                                                                                 10        11.6 +-0.02
+                                                                                                                                                  0.02
+                                                                                                                                                         17MIN   24MAX
+
+
+
+                          R0.5
+
+
+
+
+          黑U                                                             2.5MAX                                                   8                  4MAX
+               A
+          黄V        红W                                                                                                           14.5
+
+
+
+
+                                                                     保密说明：PROPRIETARY AND CONFIDENTIAL
+                                             此份图纸包含的所有信息均只属于CubeMars财产。未经CubeMars书面许可，禁止部分或全部复制。
+                                        THE INFORMATION CONTAINED IN THIS DRAWING IS THE SOLE PROPERTY OF CubeMars. ANY REPRODUCTION IN
+                                                  PART OR AS A WHOLE WITHOUT THE WRITTEN PERMISSION OF CubeMars IS PROHIBITED.
+
+
+                                                                                 签名                                         日期          标题（TITLE）                         电机
+
+                                      制图(DRAWN)                                  倪董                                  2026/8/13           型号(NO)                           RI20
+
+                                      审核(CHECKED)                                                                                        版本(REV)                   A     单位(UNIT)   mm
+                                                                此图纸标注的尺寸有限。个别尺寸公差据要求提供。
+                                               THIS IS A LIMITED DIMENSION DRAWING. SPECIFIC TOLERANCE AVAILABLE UPON REQUEST.
+                                                                                                                                        比例(SCALE)                1:1     视角(VIEW)
+

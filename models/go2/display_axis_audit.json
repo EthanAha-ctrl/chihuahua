@@ -1,0 +1,887 @@
+{
+  "model": "go2",
+  "urdf_sha256": "7d19fe48e2e689ee1a032ab99f2a4a8b671d87e73de48d3e65811682a5b48b9e",
+  "mesh_sources_sha256": "9be23b658475f2ef89be3aed4458264457633eb7ef7407c407136497ffe1a35f",
+  "joints": {
+    "FL_hip_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        -0.06131595000624657,
+        -0.0,
+        -0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/hip.dae",
+      "circular_candidates": [
+        {
+          "facet": 5383,
+          "center_link_m": [
+            -0.06131595000624657,
+            -0.0006912522734216866,
+            5.310203557315912e-05
+          ],
+          "radius_mm": 28.500002926440082,
+          "circle_residual_mm": 0.0005162746226188009,
+          "axis_distance_mm": 0.6932889236766034,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 24
+        },
+        {
+          "facet": 5386,
+          "center_link_m": [
+            -0.06231600046157837,
+            -0.0006912365081660806,
+            5.301165424782281e-05
+          ],
+          "radius_mm": 29.000001997014575,
+          "circle_residual_mm": 0.0005760509950679393,
+          "axis_distance_mm": 0.6932662877334558,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 48
+        },
+        {
+          "facet": 5387,
+          "center_link_m": [
+            -0.06231600046157837,
+            -0.000691309964711226,
+            5.325041585610836e-05
+          ],
+          "radius_mm": 23.299972775145907,
+          "circle_residual_mm": 0.00039344482189590524,
+          "axis_distance_mm": 0.6933578254392785,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 20
+        },
+        {
+          "facet": 5454,
+          "center_link_m": [
+            -0.06961596012115479,
+            -0.0006913452257611745,
+            5.315658230740424e-05
+          ],
+          "radius_mm": 25.699948853708037,
+          "circle_residual_mm": 0.0006268059325950648,
+          "axis_distance_mm": 0.6933857825376673,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5459,
+          "center_link_m": [
+            -0.06929600238800049,
+            -0.0006914123355977183,
+            5.30947149953437e-05
+          ],
+          "radius_mm": 24.609951852951298,
+          "circle_residual_mm": 0.0005661815407169424,
+          "axis_distance_mm": 0.6934479552043749,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 64
+        },
+        {
+          "facet": 5557,
+          "center_link_m": [
+            -0.06261599063873291,
+            -0.0006913452257611736,
+            5.315658230740471e-05
+          ],
+          "radius_mm": 25.699948853708033,
+          "circle_residual_mm": 0.0006268059325985342,
+          "axis_distance_mm": 0.6933857825376665,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5561,
+          "center_link_m": [
+            -0.06293600052595139,
+            -0.0006914123355687106,
+            5.308851690740849e-05
+          ],
+          "radius_mm": 24.609952711259236,
+          "circle_residual_mm": 0.0005690099615859867,
+          "axis_distance_mm": 0.69344748063859,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 66
+        },
+        {
+          "facet": 5564,
+          "center_link_m": [
+            -0.06261599063873291,
+            -0.0006911697589268611,
+            5.30655493230356e-05
+          ],
+          "radius_mm": 20.999979510228258,
+          "circle_residual_mm": 0.0006755980114479809,
+          "axis_distance_mm": 0.6932038575916689,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 36
+        }
+      ],
+      "degenerate_facets_excluded": 16,
+      "measured": {
+        "facet": 5383,
+        "center_link_m": [
+          -0.06131595000624657,
+          -0.0006912522734216866,
+          5.310203557315912e-05
+        ],
+        "radius_mm": 28.500002926440082,
+        "circle_residual_mm": 0.0005162746226188009,
+        "axis_distance_mm": 0.6932889236766034,
+        "normal_axis_angle_deg": 0.0,
+        "hull_vertices": 24
+      }
+    },
+    "FR_hip_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        -0.06131595000624657,
+        -0.0,
+        -0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/hip.dae",
+      "circular_candidates": [
+        {
+          "facet": 5383,
+          "center_link_m": [
+            -0.06131595000624657,
+            0.0006912473503603774,
+            -5.316608234971317e-05
+          ],
+          "radius_mm": 28.500002926440082,
+          "circle_residual_mm": 0.0005162746226049231,
+          "axis_distance_mm": 0.6932889236766003,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 24
+        },
+        {
+          "facet": 5386,
+          "center_link_m": [
+            -0.06231600046157837,
+            0.0006912315934789926,
+            -5.307569956406572e-05
+          ],
+          "radius_mm": 29.000001997014575,
+          "circle_residual_mm": 0.0005760509950679393,
+          "axis_distance_mm": 0.6932662877334527,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 48
+        },
+        {
+          "facet": 5387,
+          "center_link_m": [
+            -0.06231600046157837,
+            0.0006913050279017118,
+            -5.3314467977341555e-05
+          ],
+          "radius_mm": 23.299972775145925,
+          "circle_residual_mm": 0.0003934448218993747,
+          "axis_distance_mm": 0.6933578254392846,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 20
+        },
+        {
+          "facet": 5454,
+          "center_link_m": [
+            -0.06961596012115479,
+            0.0006913402976455138,
+            -5.3220637696103526e-05
+          ],
+          "radius_mm": 25.69994885370803,
+          "circle_residual_mm": 0.0006268059326054731,
+          "axis_distance_mm": 0.6933857825376633,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5459,
+          "center_link_m": [
+            -0.06929600238800049,
+            0.0006914074132140039,
+            -5.315877660227185e-05
+          ],
+          "radius_mm": 24.609951852951294,
+          "circle_residual_mm": 0.0005661815407134729,
+          "axis_distance_mm": 0.6934479552043762,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 64
+        },
+        {
+          "facet": 5557,
+          "center_link_m": [
+            -0.06261599063873291,
+            0.0006913402976455187,
+            -5.32206376961027e-05
+          ],
+          "radius_mm": 25.69994885370803,
+          "circle_residual_mm": 0.0006268059325881259,
+          "axis_distance_mm": 0.6933857825376679,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5561,
+          "center_link_m": [
+            -0.06293600052595139,
+            0.000691407413759265,
+            -5.315257851435858e-05
+          ],
+          "radius_mm": 24.60995271125921,
+          "circle_residual_mm": 0.0005690099615859867,
+          "axis_distance_mm": 0.6934474806385849,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 66
+        },
+        {
+          "facet": 5564,
+          "center_link_m": [
+            -0.06261599063873291,
+            0.0006911648392464944,
+            -5.312958845449452e-05
+          ],
+          "radius_mm": 20.99997951022826,
+          "circle_residual_mm": 0.000675598011441042,
+          "axis_distance_mm": 0.693203857591673,
+          "normal_axis_angle_deg": 0.0,
+          "hull_vertices": 36
+        }
+      ],
+      "degenerate_facets_excluded": 16,
+      "measured": {
+        "facet": 5383,
+        "center_link_m": [
+          -0.06131595000624657,
+          0.0006912473503603774,
+          -5.316608234971317e-05
+        ],
+        "radius_mm": 28.500002926440082,
+        "circle_residual_mm": 0.0005162746226049231,
+        "axis_distance_mm": 0.6932889236766003,
+        "normal_axis_angle_deg": 0.0,
+        "hull_vertices": 24
+      }
+    },
+    "RL_hip_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        0.06131595466315164,
+        0.0,
+        0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/hip.dae",
+      "circular_candidates": [
+        {
+          "facet": 5383,
+          "center_link_m": [
+            0.06131595466315164,
+            -0.0006912522734216896,
+            -4.742089247370197e-05
+          ],
+          "radius_mm": 28.500002926440086,
+          "circle_residual_mm": 0.0005162746226049231,
+          "axis_distance_mm": 0.6928769346382204,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 24
+        },
+        {
+          "facet": 5386,
+          "center_link_m": [
+            0.062316005105816724,
+            -0.0006912365081660806,
+            -4.7237852884229314e-05
+          ],
+          "radius_mm": 29.000001997014554,
+          "circle_residual_mm": 0.0005760509950714088,
+          "axis_distance_mm": 0.6928487027964677,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 48
+        },
+        {
+          "facet": 5387,
+          "center_link_m": [
+            0.06231600512793885,
+            -0.0006913099647112241,
+            -4.747661449149021e-05
+          ],
+          "radius_mm": 23.299972775145914,
+          "circle_residual_mm": 0.0003934448218993747,
+          "axis_distance_mm": 0.6929383062240155,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 20
+        },
+        {
+          "facet": 5454,
+          "center_link_m": [
+            0.06961596474748732,
+            -0.0006913452257611762,
+            -4.670641347635454e-05
+          ],
+          "radius_mm": 25.699948853708033,
+          "circle_residual_mm": 0.0006268059326020037,
+          "axis_distance_mm": 0.6929211428745669,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5459,
+          "center_link_m": [
+            0.06929600700997417,
+            -0.0006914123355977191,
+            -4.66741913970748e-05
+          ],
+          "radius_mm": 24.609951852951312,
+          "circle_residual_mm": 0.000566181540706534,
+          "axis_distance_mm": 0.6929859291206883,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 64
+        },
+        {
+          "facet": 5557,
+          "center_link_m": [
+            0.0626159952951117,
+            -0.0006913452257611623,
+            -4.735498577641498e-05
+          ],
+          "radius_mm": 25.69994885370803,
+          "circle_residual_mm": 0.0006268059326020037,
+          "axis_distance_mm": 0.6929651620829411,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5561,
+          "center_link_m": [
+            0.06293600517465012,
+            -0.0006914123355687089,
+            -4.72572703119306e-05
+          ],
+          "radius_mm": 24.609952711259226,
+          "circle_residual_mm": 0.0005690099615859867,
+          "axis_distance_mm": 0.6930254449685898,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 66
+        },
+        {
+          "facet": 5564,
+          "center_link_m": [
+            0.06261599528667719,
+            -0.0006911697589268638,
+            -4.726395279243732e-05
+          ],
+          "radius_mm": 20.999979510228254,
+          "circle_residual_mm": 0.0006755980114445115,
+          "axis_distance_mm": 0.6927838890220996,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 36
+        }
+      ],
+      "degenerate_facets_excluded": 16,
+      "measured": {
+        "facet": 5383,
+        "center_link_m": [
+          0.06131595466315164,
+          -0.0006912522734216896,
+          -4.742089247370197e-05
+        ],
+        "radius_mm": 28.500002926440086,
+        "circle_residual_mm": 0.0005162746226049231,
+        "axis_distance_mm": 0.6928769346382204,
+        "normal_axis_angle_deg": 0.005308659630864067,
+        "hull_vertices": 24
+      }
+    },
+    "RR_hip_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        0.06131594481702906,
+        0.0,
+        0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/hip.dae",
+      "circular_candidates": [
+        {
+          "facet": 5383,
+          "center_link_m": [
+            0.06131594481702906,
+            0.0006912473503603822,
+            5.884722499303303e-05
+          ],
+          "radius_mm": 28.500002926440075,
+          "circle_residual_mm": 0.0005162746226222703,
+          "axis_distance_mm": 0.6937477173076892,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 24
+        },
+        {
+          "facet": 5386,
+          "center_link_m": [
+            0.0623159952764426,
+            0.0006912315934789903,
+            5.88495004722968e-05
+          ],
+          "radius_mm": 29.000001997014568,
+          "circle_residual_mm": 0.0005760509950748782,
+          "axis_distance_mm": 0.6937322102435081,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 48
+        },
+        {
+          "facet": 5387,
+          "center_link_m": [
+            0.06231599525431984,
+            0.0006913050279017056,
+            5.9088268884544676e-05
+          ],
+          "radius_mm": 23.29997277514592,
+          "circle_residual_mm": 0.0003934448219132525,
+          "axis_distance_mm": 0.6938256734381844,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 20
+        },
+        {
+          "facet": 5454,
+          "center_link_m": [
+            0.069615954891256,
+            0.000691340297645519,
+            5.9670806070549036e-05
+          ],
+          "radius_mm": 25.699948853708023,
+          "circle_residual_mm": 0.0006268059325985342,
+          "axis_distance_mm": 0.693910665897062,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5459,
+          "center_link_m": [
+            0.06929599716520676,
+            0.0006914074132140051,
+            5.9579299744468294e-05
+          ],
+          "radius_mm": 24.609951852951298,
+          "circle_residual_mm": 0.0005661815407238813,
+          "axis_distance_mm": 0.6939696708108526,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 64
+        },
+        {
+          "facet": 5557,
+          "center_link_m": [
+            0.06261598543888042,
+            0.0006913402976455109,
+            5.902223377048906e-05
+          ],
+          "radius_mm": 25.699948853708033,
+          "circle_residual_mm": 0.0006268059325950648,
+          "axis_distance_mm": 0.6938551947112898,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 90
+        },
+        {
+          "facet": 5561,
+          "center_link_m": [
+            0.06293599533103124,
+            0.0006914074137592633,
+            5.8983824653813905e-05
+          ],
+          "radius_mm": 24.609952711259226,
+          "circle_residual_mm": 0.0005690099615859867,
+          "axis_distance_mm": 0.6939188017139074,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 66
+        },
+        {
+          "facet": 5564,
+          "center_link_m": [
+            0.06261598544731647,
+            0.0006911648392464958,
+            5.8931184529271944e-05
+          ],
+          "radius_mm": 20.99997951022825,
+          "circle_residual_mm": 0.0006755980114445115,
+          "axis_distance_mm": 0.6936726313763991,
+          "normal_axis_angle_deg": 0.005308659630864067,
+          "hull_vertices": 36
+        }
+      ],
+      "degenerate_facets_excluded": 16,
+      "measured": {
+        "facet": 5383,
+        "center_link_m": [
+          0.06131594481702906,
+          0.0006912473503603822,
+          5.884722499303303e-05
+        ],
+        "radius_mm": 28.500002926440075,
+        "circle_residual_mm": 0.0005162746226222703,
+        "axis_distance_mm": 0.6937477173076892,
+        "normal_axis_angle_deg": 0.005308659630864067,
+        "hull_vertices": 24
+      }
+    },
+    "FL_thigh_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        -0.0,
+        -0.04849499101625267,
+        -0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/thigh.dae",
+      "circular_candidates": [
+        {
+          "facet": 29,
+          "center_link_m": [
+            0.00023744436166045984,
+            -0.056795001131160906,
+            0.000621104315920655
+          ],
+          "radius_mm": 47.74995706078356,
+          "circle_residual_mm": 0.0005460397926315697,
+          "axis_distance_mm": 0.6649439045059425,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 86,
+          "center_link_m": [
+            0.00023744436166045737,
+            -0.04849499101625267,
+            0.0006211056681665536
+          ],
+          "radius_mm": 47.74995706078355,
+          "circle_residual_mm": 0.0005460397926176919,
+          "axis_distance_mm": 0.6649451675987751,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1352,
+          "center_link_m": [
+            0.00023745234751085882,
+            -0.056795951080204056,
+            0.0006212101024271367
+          ],
+          "radius_mm": 47.74992245164356,
+          "circle_residual_mm": 0.0006485378519008322,
+          "axis_distance_mm": 0.6650455688867879,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1413,
+          "center_link_m": [
+            0.00023745234751085844,
+            -0.04849594096529588,
+            0.0006212114546731706
+          ],
+          "radius_mm": 47.749922451643435,
+          "circle_residual_mm": 0.0006485378519285878,
+          "axis_distance_mm": 0.6650468320017578,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        }
+      ],
+      "degenerate_facets_excluded": 6,
+      "measured": {
+        "facet": 86,
+        "center_link_m": [
+          0.00023744436166045737,
+          -0.04849499101625267,
+          0.0006211056681665536
+        ],
+        "radius_mm": 47.74995706078355,
+        "circle_residual_mm": 0.0005460397926176919,
+        "axis_distance_mm": 0.6649451675987751,
+        "normal_axis_angle_deg": 9.313570918021479e-06,
+        "hull_vertices": 81
+      }
+    },
+    "FR_thigh_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        0.0,
+        0.048494990813869064,
+        0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/thigh_mirror.dae",
+      "circular_candidates": [
+        {
+          "facet": 29,
+          "center_link_m": [
+            0.00023744007371952447,
+            0.05679500092877728,
+            0.0006211120819197835
+          ],
+          "radius_mm": 47.74994800564599,
+          "circle_residual_mm": 0.0005533599005680401,
+          "axis_distance_mm": 0.6649496273513213,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 86,
+          "center_link_m": [
+            0.00023744007371952935,
+            0.048494990813869064,
+            0.0006211107296738051
+          ],
+          "radius_mm": 47.749948005645884,
+          "circle_residual_mm": 0.0005533599006443679,
+          "axis_distance_mm": 0.6649483642538435,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1354,
+          "center_link_m": [
+            0.00023745753289403744,
+            0.05679595087778672,
+            0.0006212166304893872
+          ],
+          "radius_mm": 47.74993277613543,
+          "circle_residual_mm": 0.0006505868812706206,
+          "axis_distance_mm": 0.6650535180906201,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1415,
+          "center_link_m": [
+            0.00023745753289403746,
+            0.04849594076287846,
+            0.0006212152782434505
+          ],
+          "radius_mm": 47.749932776135395,
+          "circle_residual_mm": 0.0006505868813053151,
+          "axis_distance_mm": 0.6650522549779155,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        }
+      ],
+      "degenerate_facets_excluded": 6,
+      "measured": {
+        "facet": 86,
+        "center_link_m": [
+          0.00023744007371952935,
+          0.048494990813869064,
+          0.0006211107296738051
+        ],
+        "radius_mm": 47.749948005645884,
+        "circle_residual_mm": 0.0005533599006443679,
+        "axis_distance_mm": 0.6649483642538435,
+        "normal_axis_angle_deg": 9.313570918021479e-06,
+        "hull_vertices": 81
+      }
+    },
+    "RL_thigh_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        -0.0,
+        -0.04849499101625267,
+        -0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/thigh.dae",
+      "circular_candidates": [
+        {
+          "facet": 29,
+          "center_link_m": [
+            0.00023744436166045984,
+            -0.056795001131160906,
+            0.000621104315920655
+          ],
+          "radius_mm": 47.74995706078356,
+          "circle_residual_mm": 0.0005460397926315697,
+          "axis_distance_mm": 0.6649439045059425,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 86,
+          "center_link_m": [
+            0.00023744436166045737,
+            -0.04849499101625267,
+            0.0006211056681665536
+          ],
+          "radius_mm": 47.74995706078355,
+          "circle_residual_mm": 0.0005460397926176919,
+          "axis_distance_mm": 0.6649451675987751,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1352,
+          "center_link_m": [
+            0.00023745234751085882,
+            -0.056795951080204056,
+            0.0006212101024271367
+          ],
+          "radius_mm": 47.74992245164356,
+          "circle_residual_mm": 0.0006485378519008322,
+          "axis_distance_mm": 0.6650455688867879,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1413,
+          "center_link_m": [
+            0.00023745234751085844,
+            -0.04849594096529588,
+            0.0006212114546731706
+          ],
+          "radius_mm": 47.749922451643435,
+          "circle_residual_mm": 0.0006485378519285878,
+          "axis_distance_mm": 0.6650468320017578,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        }
+      ],
+      "degenerate_facets_excluded": 6,
+      "measured": {
+        "facet": 86,
+        "center_link_m": [
+          0.00023744436166045737,
+          -0.04849499101625267,
+          0.0006211056681665536
+        ],
+        "radius_mm": 47.74995706078355,
+        "circle_residual_mm": 0.0005460397926176919,
+        "axis_distance_mm": 0.6649451675987751,
+        "normal_axis_angle_deg": 9.313570918021479e-06,
+        "hull_vertices": 81
+      }
+    },
+    "RR_thigh_joint": {
+      "kind": "circular_surface_projection",
+      "anchor_link_m": [
+        0.0,
+        0.048494990813869064,
+        0.0
+      ],
+      "reason": "Mesh circular face projected onto unchanged URDF axis; mesh-axis mismatch is recorded, not repaired.",
+      "mesh": "package://go2_description/dae/thigh_mirror.dae",
+      "circular_candidates": [
+        {
+          "facet": 29,
+          "center_link_m": [
+            0.00023744007371952447,
+            0.05679500092877728,
+            0.0006211120819197835
+          ],
+          "radius_mm": 47.74994800564599,
+          "circle_residual_mm": 0.0005533599005680401,
+          "axis_distance_mm": 0.6649496273513213,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 86,
+          "center_link_m": [
+            0.00023744007371952935,
+            0.048494990813869064,
+            0.0006211107296738051
+          ],
+          "radius_mm": 47.749948005645884,
+          "circle_residual_mm": 0.0005533599006443679,
+          "axis_distance_mm": 0.6649483642538435,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1354,
+          "center_link_m": [
+            0.00023745753289403744,
+            0.05679595087778672,
+            0.0006212166304893872
+          ],
+          "radius_mm": 47.74993277613543,
+          "circle_residual_mm": 0.0006505868812706206,
+          "axis_distance_mm": 0.6650535180906201,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        },
+        {
+          "facet": 1415,
+          "center_link_m": [
+            0.00023745753289403746,
+            0.04849594076287846,
+            0.0006212152782434505
+          ],
+          "radius_mm": 47.749932776135395,
+          "circle_residual_mm": 0.0006505868813053151,
+          "axis_distance_mm": 0.6650522549779155,
+          "normal_axis_angle_deg": 9.313570918021479e-06,
+          "hull_vertices": 81
+        }
+      ],
+      "degenerate_facets_excluded": 6,
+      "measured": {
+        "facet": 86,
+        "center_link_m": [
+          0.00023744007371952935,
+          0.048494990813869064,
+          0.0006211107296738051
+        ],
+        "radius_mm": 47.749948005645884,
+        "circle_residual_mm": 0.0005533599006443679,
+        "axis_distance_mm": 0.6649483642538435,
+        "normal_axis_angle_deg": 9.313570918021479e-06,
+        "hull_vertices": 81
+      }
+    },
+    "FL_calf_joint": {
+      "kind": "urdf_reference",
+      "anchor_link_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "reason": "URDF axis reference; no calibrated physical center inferred from this mesh.",
+      "mesh": "package://go2_description/dae/calf.dae",
+      "circular_candidates": [],
+      "degenerate_facets_excluded": 3
+    },
+    "FR_calf_joint": {
+      "kind": "urdf_reference",
+      "anchor_link_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "reason": "URDF axis reference; no calibrated physical center inferred from this mesh.",
+      "mesh": "package://go2_description/dae/calf_mirror.dae",
+      "circular_candidates": [],
+      "degenerate_facets_excluded": 3
+    },
+    "RL_calf_joint": {
+      "kind": "urdf_reference",
+      "anchor_link_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "reason": "URDF axis reference; no calibrated physical center inferred from this mesh.",
+      "mesh": "package://go2_description/dae/calf.dae",
+      "circular_candidates": [],
+      "degenerate_facets_excluded": 3
+    },
+    "RR_calf_joint": {
+      "kind": "urdf_reference",
+      "anchor_link_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "reason": "URDF axis reference; no calibrated physical center inferred from this mesh.",
+      "mesh": "package://go2_description/dae/calf_mirror.dae",
+      "circular_candidates": [],
+      "degenerate_facets_excluded": 3
+    }
+  }
+}

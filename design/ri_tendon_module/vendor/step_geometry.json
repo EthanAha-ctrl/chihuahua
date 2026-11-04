@@ -1,0 +1,246 @@
+{
+  "ri20": [
+    {
+      "index": 0,
+      "bbox": [
+        -12.499999999999513,
+        -12.500000000001304,
+        -8.0000001,
+        12.500000000000782,
+        12.489999999999085,
+        6.5000001
+      ],
+      "center": [
+        5.679384548139746e-13,
+        -1.8323704708419792e-12,
+        -0.6712619493600673
+      ],
+      "volume": 3647.9565410869777,
+      "faces": 36,
+      "face_types": [
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "TORUS"
+      ]
+    },
+    {
+      "index": 1,
+      "bbox": [
+        -1.4500000000000033,
+        -16.999999999999996,
+        -7.999999999999976,
+        -0.9500000000000037,
+        -11.999999999999996,
+        -7.499999999999976
+      ],
+      "center": [
+        -1.2000000000000033,
+        -14.499999999999998,
+        -7.749999999999976
+      ],
+      "volume": 0.981747704246809,
+      "faces": 4,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE"
+      ]
+    },
+    {
+      "index": 2,
+      "bbox": [
+        -0.8500000000000032,
+        -16.999999999999996,
+        -7.999999999999988,
+        -0.35000000000000364,
+        -11.999999999999996,
+        -7.499999999999988
+      ],
+      "center": [
+        -0.6000000000000034,
+        -14.499999999999998,
+        -7.749999999999988
+      ],
+      "volume": 0.981747704246808,
+      "faces": 4,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE"
+      ]
+    },
+    {
+      "index": 3,
+      "bbox": [
+        -0.2500000000000032,
+        -16.999999999999996,
+        -8.0,
+        0.2499999999999963,
+        -11.999999999999996,
+        -7.500000000000001
+      ],
+      "center": [
+        -3.480247030364484e-15,
+        -14.499999999999998,
+        -7.750000000000002
+      ],
+      "volume": 0.981747704246809,
+      "faces": 4,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE"
+      ]
+    },
+    {
+      "index": 4,
+      "bbox": [
+        -7.8999999999995145,
+        -7.900000000001152,
+        -6.0,
+        7.900000000000487,
+        7.899999999998849,
+        4.0
+      ],
+      "center": [
+        4.796163466380676e-13,
+        -1.1439738045737613e-12,
+        -1.0
+      ],
+      "volume": 903.8362064377845,
+      "faces": 6,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER"
+      ]
+    }
+  ],
+  "ri30": [
+    {
+      "index": 0,
+      "bbox": [
+        -19.000000000000128,
+        -25.0000001,
+        -3.0000001,
+        19.000000000000128,
+        18.99342105263172,
+        11.000000100000001
+      ],
+      "center": [
+        0.0018129379626008614,
+        -0.04019540865386285,
+        3.9618998179498406
+      ],
+      "volume": 9451.652876102919,
+      "faces": 40,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "TORUS",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "PLANE",
+        "CYLINDER",
+        "PLANE"
+      ]
+    },
+    {
+      "index": 1,
+      "bbox": [
+        -11.19,
+        -11.19,
+        0.0,
+        11.19,
+        11.19,
+        8.0
+      ],
+      "center": [
+        -9.960183515467884e-18,
+        6.832227476776282e-16,
+        3.999999999999999
+      ],
+      "volume": 1331.1832851942222,
+      "faces": 6,
+      "face_types": [
+        "CYLINDER",
+        "CYLINDER",
+        "PLANE",
+        "PLANE",
+        "CYLINDER",
+        "CYLINDER"
+      ]
+    }
+  ]
+}

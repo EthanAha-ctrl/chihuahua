@@ -1,0 +1,725 @@
+<?xml version="1.0"?>
+<robot name="Aibo">
+
+  <link name="base_link" >
+    <inertial>
+      <mass value="1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+    <collision name="geom">
+      <origin xyz="0 0 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <cylinder radius="0.055" length="0.240"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 0 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/body1.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+      <origin xyz="0.0 0 0" rpy="0 1.5707 1.5707"/>
+    </visual>
+  </link>
+
+  <link name="RF_up_leg_rot_y" >
+    <collision name="geom">
+      <origin xyz="0.05 -0.004 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.05 -0.004 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.4 0.4 0.4 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="RF_up_leg_rot_x" >
+    <collision name="geom">
+      <origin xyz="-0.0125 -0.004 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RFup.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.0625 -0.065 -0.162" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RFup.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="RF_down_leg" >
+    <collision name="geom">
+      <origin xyz="0.0095 -0.0264248742893 -0.0315004739603" rpy="-0.51 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.080"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.0625 -0.107732480951 -0.05190447109" rpy="-5.38812321401e-05 -0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RFdown.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="legRF1">
+    <origin xyz="0 0.065 0.162" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-2.09" upper="2.36" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base_link"/>
+    <child link="RF_up_leg_rot_y"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legRF2">
+    <origin xyz="0.0625 0 0" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-1.58825" upper="0.15708" velocity="0.5"/>
+    <axis xyz="0 -1 0"/>
+    <parent link="RF_up_leg_rot_y"/>
+    <child link="RF_up_leg_rot_x"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legRF3">
+    <origin xyz="0 0.009 -0.0695" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.506" upper="2.0768" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="RF_up_leg_rot_x"/>
+    <child link="RF_down_leg"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="LF_up_leg_rot_y" >
+    <collision name="geom">
+      <origin xyz="-0.05 -0.004 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.05 -0.004 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+      <material name="grey"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="LF_up_leg_rot_x" >
+    <collision name="geom">
+      <origin xyz="0.0125 -0.004 -0.0275" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.075"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.0625 -0.065 -0.162" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LFup.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="LF_down_leg" >
+    <collision name="geom">
+      <origin xyz="-0.0095 -0.013 -0.0075" rpy="-0.51 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.080"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.0625 -0.107732480951 -0.05190447109" rpy="-5.38812321401e-05 -0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LFdown.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="legLF1">
+    <origin xyz="0 0.065 0.162" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-2.094" upper="2.36" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base_link"/>
+    <child link="LF_up_leg_rot_y"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legLF2">
+    <origin xyz="-0.0625 0 0" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.15708" upper="1.58825" velocity="0.5"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LF_up_leg_rot_y"/>
+    <child link="LF_up_leg_rot_x"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legLF3">
+    <origin xyz="0 0.009 -0.0695" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.506" upper="2.0768" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="LF_up_leg_rot_x"/>
+    <child link="LF_down_leg"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="RB_up_leg_rot_y" >
+    <collision name="geom">
+      <origin xyz="0.05 -0.003 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.05 -0.003 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+      <material name="grey"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="RB_up_leg_rot_x" >
+    <collision name="geom">
+      <origin xyz="-0.0125 -0.003 -0.0275" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.075"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.0625 0.065 -0.162" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RBup.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="RB_down_leg" >
+    <collision name="geom">
+      <origin xyz="0.0095 0.0194248742893 -0.0335004739603" rpy="0.51 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.080"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.0625 0.102707122248 -0.0482166954485" rpy="5.38812321401e-05 0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RBdown.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="legRB1">
+    <origin xyz="0 -0.065 0.162" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-2.3387" upper="2.094" velocity="0.5"/>
+    <axis xyz="-1 0 0"/>
+    <parent link="base_link"/>
+    <child link="RB_up_leg_rot_y"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legRB2">
+    <origin xyz="0.0625 0 0" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.15708" upper="1.58825" velocity="0.5"/>
+    <axis xyz="0 -1 0"/>
+    <parent link="RB_up_leg_rot_y"/>
+    <child link="RB_up_leg_rot_x"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legRB3">
+    <limit effort="1000.0" lower="-0.506" upper="2.0768" velocity="0.5"/>
+    <axis xyz="-1 0 0"/>
+    <origin xyz="0 -0.009 -0.0695" rpy="0 0 0"/>
+    <parent link="RB_up_leg_rot_x"/>
+    <child link="RB_down_leg"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="LB_up_leg_rot_y" >
+    <collision name="geom">
+      <origin xyz="-0.05 -0.003 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.05 -0.003 0" rpy="0 0 -1.5707"/>
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry>
+      <material name="grey"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="LB_up_leg_rot_x" >
+    <collision name="geom">
+      <origin xyz="0.0125 -0.003 -0.0275" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.075"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.0625 0.065 -0.162" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LBup.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <link name="LB_down_leg" >
+    <collision name="geom">
+      <origin xyz="-0.0095 0.0194248742893 -0.0335004739603" rpy="0.51 0 0"/>
+      <geometry>
+        <cylinder radius="0.020" length="0.080"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.0625 0.102707122248 -0.0482166954485" rpy="5.38812321401e-05 0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LBdown.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="legLB1">
+    <origin xyz="0 -0.065 0.162" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-2.094" upper="2.3387" velocity="0.5"/>
+    <axis xyz="-1 0 0"/>
+    <parent link="base_link"/>
+    <child link="LB_up_leg_rot_y"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legLB2">
+    <origin xyz="-0.0625 0 0" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.15708" upper="1.58825" velocity="0.5"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LB_up_leg_rot_y"/>
+    <child link="LB_up_leg_rot_x"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <joint type="revolute" name="legLB3">
+    <limit effort="1000.0" lower="-0.506" upper="2.0768" velocity="0.5"/>
+    <axis xyz="-1 0 0"/>
+    <origin xyz="0 -0.009 -0.0695" rpy="0 0 0"/>
+    <parent link="LB_up_leg_rot_x"/>
+    <child link="LB_down_leg"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="cuello" >
+    <collision name="geom">
+      <origin xyz="0 -0.0025 0.0225" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.013" length="0.080"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode mu='1.000000' mu2='1.000000'/>
+        </friction>
+      </surface>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 -0.0025 0.0225" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.013" length="0.090"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="neck">
+    <origin xyz="0 0.0675 0.1815" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-1.3788" upper="0.0349" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base_link"/>
+    <child link="cuello"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="pan" >
+    <collision name="geom">
+      <origin xyz="0 -0.0025 0.1525" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.025"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode mu='1.000000' mu2='1.000000'/>
+        </friction>
+      </surface>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 -0.0025 0.0725" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.025"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="headPan">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-1.5882" upper="1.5882" velocity="0.5"/>
+    <axis xyz="0 0 1"/>
+    <parent link="cuello"/>
+    <child link="pan"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="head" >
+    <collision name="geom">
+      <origin xyz="0 0.0225 -0.0075" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/head.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <surface>
+        <friction>
+          <ode mu='1.000000' mu2='1.000000'/>
+        </friction>
+      </surface>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 -0.0965 -0.2425" rpy="0 0 -1.5707"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/head.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="headTilt">
+    <origin xyz="0 0 0.08" rpy="0 0 0"/>
+    <limit effort="1000.0" lower="-0.28" upper="0.77" velocity="0.5"/>
+    <axis xyz="1 0 0"/>
+    <parent link="pan"/>
+    <child link="head"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="RF_paw" >
+    <collision name="geom">
+      <origin xyz="-9.9683839966e-05 -0.007306086681 0.0793779442285" rpy="-0.51 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.07109968384 -0.101934957646 0.0372071394007" rpy="-5.38812321401e-05 -0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RFpaw.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="fixed" name="RF_paw_joint">
+    <origin xyz="0.0047 -0.00503005314847 -0.065240377998" rpy="0 0 0"/>
+    <parent link="RF_down_leg"/>
+    <child link="RF_paw"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+    <safety_controller k_velocity="10" k_position="15" soft_lower_limit="-2.0" soft_upper_limit="0.5" />
+  </joint>
+
+  <link name="LF_paw" >
+    <collision name="geom">
+      <origin xyz="0.000380319481791 -0.0073575716201 0.0792577873792" rpy="-0.51 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0.0713803194818 -0.101986442585 0.0370869825513" rpy="-5.38812321401e-05 -0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LFpaw.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="fixed" name="LF_paw_joint">
+    <origin xyz="-0.0047 -0.00503005314847 -0.065240377998" rpy="0 0 0"/>
+    <parent link="LF_down_leg"/>
+    <child link="LF_paw"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+    <safety_controller k_velocity="10" k_position="15" soft_lower_limit="-2.0" soft_upper_limit="0.5" />
+  </joint>
+
+  <link name="RB_paw" >
+    <collision name="geom">
+      <origin xyz="-0.000118680447963 -0.0109962231379 0.0689914323161" rpy="0.51 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="-0.071118680448 0.087123625858 0.0287733364758" rpy="5.38812321401e-05 0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/RBpaw.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="fixed" name="RB_paw_joint">
+    <origin xyz="0.0047 0.0135294473912 -0.0662802433783" rpy="0 0 0"/>
+    <parent link="RB_down_leg"/>
+    <child link="RB_paw"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+    <safety_controller k_velocity="10" k_position="15" soft_lower_limit="-2.0" soft_upper_limit="0.5" />
+  </joint>
+  <link name="LB_paw" >
+    <collision name="geom">
+      <origin xyz="0.000361322873794 -0.0109842450319 0.0689981323741" rpy="0.51 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+
+    <visual name="visual">
+      <origin xyz="0.0713613228738 0.087135603964 0.0287800365338" rpy="5.38812321401e-05 0.509999997405 -1.57068595452"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/LBpaw.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="fixed" name="LB_paw_joint">
+    <origin xyz="-0.0047 0.0135294473912 -0.0662802433783" rpy="0 0 0"/>
+    <parent link="LB_down_leg"/>
+    <child link="LB_paw"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+    <safety_controller k_velocity="10" k_position="15" soft_lower_limit="-2.0" soft_upper_limit="0.5" />
+  </joint>
+
+  <link name="tail1" >
+    <collision name="geom">
+      <origin xyz="0 -0.008 -0.01" rpy="1.5707 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 -0.0179999999536 -0.00999903673205" rpy="0.785398161078 1.57066010014 -0.785398161078"/>
+      <geometry>
+        <cylinder radius="0.006" length="0.020"/>
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="tailTilt">
+    <origin xyz="0 -0.102 0.195" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="tail1"/>
+    <axis xyz="-1 0 0"/>
+    <limit effort="1000.0" lower="0.03" upper="1.1" velocity="0.5"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+  <link name="tail2" >
+    <collision name="geom">
+      <origin xyz="0 -0.008 -0.01" rpy="1.5707 0 0"/>
+      <geometry>
+        <sphere radius="0.015"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 0.11198506879 -0.165011558496" rpy="9.63267944498e-05 0 -1.57079631752"/>
+      <geometry>
+        <mesh filename="package://aibo_description/meshes/tail.stl" scale="0.13 0.13 0.13" />
+      </geometry>
+      <material name="black"></material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx='1' ixy='0' ixz='0' iyy='1' iyz='0' izz='1'/>
+    </inertial>
+  </link>
+
+  <joint type="revolute" name="tailPan">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="tail1"/>
+    <child link="tail2"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.03" upper="1.03" velocity="0.5"/>
+    <dynamics damping="10000.0" friction="10000.0"/>
+  </joint>
+
+
+  <!-- Kinematic marker only: 5 mm display sphere, no measured mesh/inertia.
+       Zero mass/effort/velocity disable dynamics; they are not hardware ratings. -->
+  <link name="mouth">
+    <visual name="joint_marker">
+      <geometry><sphere radius="0.005"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint type="revolute" name="mouth">
+    <parent link="head"/>
+    <child link="mouth"/>
+    <origin xyz="0 0.0400000943066 -0.0174997270786" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.959931088597" upper="0" effort="0" velocity="0"/>
+  </joint>
+
+  <!-- Kinematic marker only: 5 mm display sphere, no measured mesh/inertia.
+       Zero mass/effort/velocity disable dynamics; they are not hardware ratings. -->
+  <link name="earR">
+    <visual name="joint_marker">
+      <geometry><sphere radius="0.005"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint type="revolute" name="earR">
+    <parent link="head"/>
+    <child link="earR"/>
+    <origin xyz="0.042 0 0.0145" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0" upper="0.174532925199" effort="0" velocity="0"/>
+  </joint>
+
+  <link name="earR_frame"/>
+  <joint type="fixed" name="earR_frame">
+    <parent link="earR"/>
+    <child link="earR_frame"/>
+    <origin xyz="0 -0.0111 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Kinematic marker only: 5 mm display sphere, no measured mesh/inertia.
+       Zero mass/effort/velocity disable dynamics; they are not hardware ratings. -->
+  <link name="earL">
+    <visual name="joint_marker">
+      <geometry><sphere radius="0.005"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint type="revolute" name="earL">
+    <parent link="head"/>
+    <child link="earL"/>
+    <origin xyz="-0.042 0 0.0145" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0" upper="0.174532925199" effort="0" velocity="0"/>
+  </joint>
+
+  <link name="earL_frame"/>
+  <joint type="fixed" name="earL_frame">
+    <parent link="earL"/>
+    <child link="earL_frame"/>
+    <origin xyz="0 -0.0111 0" rpy="0 0 0"/>
+  </joint>
+</robot>
