@@ -1,151 +1,153 @@
-Boston Dynamics 有非常深的 robot locomotion know-how:
+This repo is trying to build a loop, inner loop, outer loop, co-optimize geometry, material, actuator, controller for a single set of goals: small set of action tasks (3K tasks).
+The loop will be:
 
-硬件集成、控制、动态平衡、执行器、可靠性、实机调参、跌倒恢复、量产工程，世界顶级。强在：
+Outer loop: actuator, selection from component list
+	Inner loop: geometry, FEM/FEA
+		Inner inner loop: RL control with few human-labeling, Mujoco
 
-```text
-robot performs tasks
-robot remains stable
-robot survives commercial use
-robot carries payload
-robot navigates human terrain
+With that we'll be able to get an quadrupedal robot that is highly optimized for `wild survival` which is defined by the 3K tasks.
+
+To make it happen, the project comes in multiple phases.
+### phase 1, proof of concept
+Get parts ready :
+a. Basic motion with given geometry;
+b. Mujoco sim with gravity and landing plane;
+c. FEM/FEA at a certain snapshot where the Mujoco gives max torque. The assumption is that when joint torque reaches maximum, the articulation takes the max force.
+c. Human controlled motion annotation with Scuf Omega Wireless PlayStation joystick.
+d. Task definition. Reward definition. RL framework.
+
+
+### phase 2, the loop
+#### 2.1 Construct the loop
+With these parts, we construct the outer inner loop:
+
+
+```mermaid
+flowchart TD
+    TASK["d. Task, Reward. RL."]
+    LIST["Actuator List"]
+
+    subgraph OUTER["Outer loop, actuator selection"]
+        A["Select actuator"]
+
+        subgraph INNER["mid loop：Opt for geometry / material"]
+            G["geometry / material design"]
+            SIM["b. 构建 MuJoCo 模型<br/>重力 + 地面 + 执行器参数"]
+
+            subgraph RL["最内层循环：固定设计，优化 controller"]
+                HUMAN["c. Scuf Omega<br/>人工控制与动作标注"]
+                TRAIN["d. RL 训练 controller"]
+                RUN["b. MuJoCo 执行任务"]
+                REWARD["d. 计算 Reward"]
+                TRAIN --> RUN --> REWARD --> TRAIN
+                HUMAN --> TRAIN
+            end
+
+            EVAL["评估 controller<br/>记录任务表现与载荷轨迹"]
+            SNAP["提取最大关节扭矩时刻的 snapshot"]
+            FEM["c. 对 snapshot 做 FEM / FEA"]
+            UPDATE["根据任务表现与结构结果<br/>更新 geometry / material"]
+
+            G --> SIM --> TRAIN
+            RUN --> EVAL
+            EVAL --> SNAP --> FEM --> UPDATE
+            EVAL --> UPDATE
+            UPDATE -->|"继续结构优化"| G
+        end
+
+        RESULT["当前 actuator 配置的优化结果<br/>geometry + material + controller + 任务表现"]
+        COMPARE["比较执行器配置"]
+        A --> G
+        A --> SIM
+        UPDATE -->|"达到中层停止条件"| RESULT
+        RESULT --> COMPARE
+        COMPARE -->|"下一组 actuator"| A
+    end
+
+    LIST --> A
+    TASK --> TRAIN
+    TASK --> EVAL
+    COMPARE -->|"达到外层停止条件"| FINAL["输出选定设计与 controller"]
 ```
 
-传统 robotics 的“task”通常是外部指定的：
+### 2.2 differentiable
 
-```text
-go there
-inspect this
-carry that
-open door
-avoid obstacle
-return to dock
+Build parametric model of actuator set.
+希望任务表现的梯度，能一路传回 actuator 参数，并且包含 geometry／material 重新优化、controller 重新训练后的影响.
+
+用 $a$ 表示 actuator 参数，$x$ 表示 geometry／material 参数，$\theta$ 表示 controller 参数：
+$$\begin{aligned} \theta^*(a,x) &=\operatorname*{arg\,min}_{\theta} L_{\mathrm{RL}}(a,x,\theta)\\ x^*(a) &=\operatorname*{arg\,min}_{x} L_{\mathrm{design}}\big(a,x,\theta^*(a,x)\big)\\ F(a) &=L_{\mathrm{task}}\big(a,x^*(a),\theta^*(a,x^*(a))\big) \end{aligned} $$
+
+中层还要满足 FEM 强度等约束。外层需要的是 $dF/da$：改变执行器后，让结构和控制器适应它，最终任务表现会怎样变化。外层直接优化 component list 的选择权重，用连续松弛让执行器选型参与求导。假设每个关节 $j$ 有 $K$ 个候选执行器，为它们设置可训练参数 $\alpha_{j,k}$：
+
+$$ p_{j,k} = \frac{\exp(\alpha_{j,k}/\tau)} {\sum_{\ell=1}^{K}\exp(\alpha_{j,\ell}/\tau)} $$
+
+$p_{j,k}$ 是选择权重，$\tau$ 控制选择有多集中。你的 actuator parametric model 用这些权重生成松弛后的执行器模型，例如：
+
+$$ m_j=\sum_k p_{j,k}m_k,\qquad T_j(\omega)=\sum_k p_{j,k}T_k(\omega) $$
+
+质量、尺寸、惯量、扭矩—转速曲线等都必须使用**同一组选择权重**，避免分别挑选各型号最有利的属性。
+
+三层循环于是变成：
+
+```
+外层更新 actuator 选择参数 α
+    ↓ softmax
+各关节的候选权重 p
+    ↓ actuator parametric model
+松弛后的执行器物理模型
+    ↓
+中层优化 geometry / material
+    ↓
+内层训练 controller
+    ↓
+任务表现 + FEM 约束
+    ↓
+梯度穿过内部优化，更新 α
 ```
 
-环境是被工程师定义的，奖励函数是被工程师写的，失败模式是被测试场景枚举的。
+连续松弛解决了“候选选择”这个离散节点。MuJoCo、FEM、快照选择以及内部训练更新的求导路径，仍需要接通，才能得到你要的外层梯度。最后逐渐降低温度，让权重集中，再取：
+$$ k_j^*=\arg\max_k p_{j,k} $$
+得到实际采购型号。降温不保证自动成为 one-hot；最终离散化后，需要重新优化结构、训练控制器并验证，因为优化过程中使用的混合执行器可能没有对应实物。用连续权重搜索执行器组合，让经过结构优化和控制训练后的任务表现决定选型。
 
 ---
 
-https://chiwuawua.com/
 
-`SURVIVAL_TO_DESIGN_GOALS.md` 很关键, 它把工程拉到“恢复一个智能动物继续生活的能力”。
- **return-to-wild / return-to-hunt prosthetic animal architecture** 是 know-how。
-它是一个 living agent, 目标是:
+## actuator vendor list
 
-```text
-stay alive
-stay with pack / family
-seek food
-avoid danger
-learn household rules
-respond to social reward
-adapt to humans
-form attachment
-recover after injury
-keep behaving like itself
-```
+| 厂商／型号                           | 重量 g | 额定／持续扭矩 N·m | 峰值／最大扭矩 N·m | 减速比 | 驱动器   | Sources                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------- | ---- | ----------- | ----------- | --- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CubeMars AKE40-6                | 140  | 1.8         | 5.5         | 6   | 外配    | [官方系列参数表](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html)                                                                                                                                                                                                                                                                                                                                                                                                          |
+| CubeMars AKE50-8                | 190  | 2.5         | 7.5         | 8   | 外配    | [厂家](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| CubeMars AKE60-8                | 260  | 5           | 12.5        | 8   | 外配    | [厂家](https://www.cubemars.com/product/ake60-8-kv80-quasi-direct-drive-actuator.html)                                                                                                                                                                                                                                                                                                                                                                                                                |
+| SteadyWin GIM3505-8 V1.1＋GDZ34  | 97   | 0.67        | 1.79        | 8   | GDZ34 | [产品页](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module) · [GDZ 参数表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/1594c9b8/Planetary-Reduction-Motor-Selection-Table-GDZ-Driver.xlsx) · [RCDrone（版本待核对）](https://rcdrone.top/products/steadywin-gim3505-8-planetary-reducer-servo-motor)                                                                                                             |
+| SteadyWin GIM4305-10 V1.1＋GDZ34 | 150  | 1.05        | 3.82        | 10  | GDZ34 | [产品页](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module-2) · [GDZ 参数表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/1594c9b8/Planetary-Reduction-Motor-Selection-Table-GDZ-Driver.xlsx) · [AIFitLab（配置待核对）](https://aifitlab.com/products/steadywin-gim4305-planetary-reducer-servo-motor) · [Pupper V3（配置待核对）](https://pupper-v3-documentation.readthedocs.io/en/latest/learn_more/tech_specs.html) |
+| DAMIAO DM-J3507-2EC（24 V）       | 150  | 0.8         | 3           | 7   | 内置    | [厂家](https://www.mdmbot.com/index.php?c=show&id=118) · [AIFitLab](https://aifitlab.com/products/damiao-dm-j3507-2ec-motor) · [RoboticsCenter](https://www.roboticscenter.ai/ar/store/product/damiao-dm-j3507-2ec)                                                                                                                                                                                                                                                                                   |
 
-and
+![[actuator_mass_torque.png]]
 
-```text
-生态 use case
--> 生物行为需求
--> 形态/脊柱/关节 architecture
--> mass / torque / material / FEM / IK / MuJoCo
--> 复杂地形 refusal / survival validation
-```
-and
-
-```text
-agency
-social intrinsic behavior
-learning loop
-wild survival
-human-life adaptation
-embodied continuity
-```
-
-
-intelligence 是生态和社会性的。
-`good boy / good girl` 是关系里的 reinforcement。
-它会观察人怎么生活，学什么时候靠近、什么时候让开、谁需要陪伴、哪里安全、哪里不能碰。
-
-life context -> embodied behavior -> social learning -> survival adaptation
-
-
-
-## 供应商执行器候选清单
-
-SteadyWin／DAMIAO 候选资料核对日期：2026-11-03。列入清单表示进入选型比较，尚未完成整机重量与动态性能验证。
-
-| 厂商／型号（厂家／资料链接）                                                                                                 | 重量    | 额定／持续扭矩 | 峰值／最大扭矩      | 减速比        | 驱动器   | 与 AKE 的可比性／采购状态                                                                                   |
-| ----------------------------------------------------------------------------------------------------------- | ----- | ------- | ------------ | ---------- | ----- | ------------------------------------------------------------------------------------------------- |
-| **CubeMars AKE40-6**（基准）                                                                                    | 140 g | 1.8 N·m | 5.5 N·m      | 6:1        | 外配    | 厂标 QDD；[官方参数对比表](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html) |
-| **[CubeMars AKE50-8](https://www.cubemars.com/product/ake50-8-kv110-quasi-direct-drive-actuator.html)**（基准） | 190 g | 2.5 N·m | 7.5 N·m      | 8:1        | 外配    | 厂标 QDD；官网可下单                                                                                      |
-| **[CubeMars AKE60-8](https://www.cubemars.com/product/ake60-8-kv80-quasi-direct-drive-actuator.html)**（基准）  | 260 g | 5 N·m   | 12.5 N·m     | 8:1        | 外配    | 厂标 QDD；官网可下单                                                                                      |
-| **[Unitree GO-M8010-6](https://www.unitree.com/cn/go1/motor/)**                                             | 530 g | 5 N·m   | **23.7 N·m** | **6.33:1** | 内置    | 低减速比腿足执行器；明显更重、扭矩更大；[官方购买](https://shop.unitree.com/products/go1-motor)                           |
-| **[酷卓 CODROID CoDrive PA60](https://www.codroid.ai/download/huace/part-pa.pdf)**                            | 400 g | 3 N·m   | **9 N·m**²   | **6:1**    | 目录未说明 | 厂标准直驱；较 AKE50／60 更重；未核实直接下单渠道                                                                     |
-| **[SteadyWin GIM3505-8 V1.1](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module)** | 裸机 84 g／含驱动 97 g | 0.65／0.67 N·m | 1.27／1.79 N·m | 8:1 行星 | 可配 GDS34／GDZ34 | 优先单关节台架候选；同格双数值按 GDS34／GDZ34 顺序；价格与现货未核实 |
-| **[SteadyWin GIM4305-10 V1.1](https://steadywin-motor.com/products/built-in-planetary-reduction-motor-aloha-accessories-quadruped-robot-joint-module-2)** | 裸机 140 g／含驱动 150 g | 1.00／1.05 N·m | 3.47／3.82 N·m | 10:1 行星 | 可配 GDS34／GDZ34 | 同格双数值按 GDS34／GDZ34 顺序；Pupper 驱动版本另行确认；价格与现货未核实 |
-| **[DAMIAO DM-J3507-2EC（24 V）](https://www.mdmbot.com/index.php?c=show&id=118)** | 约 150 g，含驱动 | 0.8 N·m | 3 N·m | 7:1，结构类型待确认 | 内置 | 双编码器、输出轴单圈绝对位置；具体硬件版本、价格与现货待采购确认 |
-
-### 新增候选的版本与尺寸
-
-下表尺寸为直径 × 轴向高度，转速为减速器输出端。SteadyWin 的 V1.1 可装驱动板；V1.0 的编码器配置不能直接套用含驱动参数。
-
-| 配置 | 裸机尺寸（mm） | 含驱动尺寸（mm） | 额定输出转速（rpm） | 最高输出转速（rpm） | 反馈与通信 |
-| --- | --- | --- | ---: | ---: | --- |
-| GIM3505-8＋GDS34 | Ø43×23.6 | Ø43×30 | 225 | 384 | 14-bit；CAN |
-| GIM3505-8＋GDZ34 | Ø43×23.6 | Ø43×28.8 | 230 | 400 | 14-bit；CAN／RS485 |
-| GIM4305-10＋GDS34 | Ø53×26 | Ø53×32 | 300 | 366 | 14-bit；CAN |
-| GIM4305-10＋GDZ34 | Ø53×26 | Ø53×32 | 312 | 402 | 14-bit；CAN／RS485 |
-| DM-J3507-2EC（24 V） | 未单列 | Ø46×37.9 | 150 | 460（空载） | 双编码器；当前官网注明 CAN／CAN FD，最高 5 Mbps，需核对硬件版本 |
-
-- SteadyWin 两型号标称背隙均为 15 arcmin；原始选型表的 `Secondary Encoder Support (on the output shaft)` 均为 NO。`Stand-alone Encoder Support` 为 YES，表示独立编码器配置，不应据此记录为支持输出轴第二编码器。DM-J3507-2EC 的背隙与各型号实测回驱阻力仍待确认。
-- SteadyWin 原始 XLSX 使用 `Peak Torque` 字段，部分旧资料使用堵转扭矩；本清单保留来源口径。峰值持续时间、起跳转速下可用扭矩及 5 s 工作能力尚未验证，不能直接按峰值扭矩／重量确定跳跃选型。
-- 质量检查：16 个含驱动 GIM3505 为 1,552 g；8 个为 776 g，距 1.5 kg 整机目标余 724 g，仍需容纳另外 8 轴、骨架、绳路、电池和计算单元。16 个含驱动 GIM4305 或 DM-J3507 为约 2,400 g。
-
-来源：[SteadyWin GDS 原始选型表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/64b38c1d/Planetary-Reduction-Motor-Selection-Table-GDS-Driver.xlsx)、[GDZ 原始选型表](https://dd-prod-us-west.s3.us-west-004.backblazeb2.com/files/pc3kjn-ep/1594c9b8/Planetary-Reduction-Motor-Selection-Table-GDZ-Driver.xlsx)，由厂家参与运营的 [SteadyWin 销售站](https://steadywin-motor.com/pages/about-us) 产品页提供；[DAMIAO 产品页](https://www.mdmbot.com/index.php?c=show&id=118)与[厂家 2025 产品选型手册](https://www.worldrobotconference.com/profile/robot/download/2025/06/30/%E8%BE%BE%E5%A6%99%E7%A7%91%E6%8A%80DAMIAO%20-%202025%E5%B9%B4%E4%BA%A7%E5%93%81%E9%80%89%E5%9E%8B%E6%89%8B%E5%86%8C_20250630192546A441.pdf)。[Stanford 项目仓库](https://github.com/stanfordroboticsclub/StanfordQuadruped)确认 Pupper v3 使用 GIM4305 系列，具体驱动配置需按项目版本核对。
-
+---
 
 mechanical tendon stop + 凹轮
 
 
-mon père，三款里 GIM4305-10 扭矩密度最高（~25 Nm/kg）也最便宜。DM-J3507 软件生态最好，自带输出端绝对编码器和 MIT 模式，但减速器类型和背隙都查不到。GIM3505-8 最小（97 g），只有约 1.3–1.8 Nm。
-
-| | SteadyWin GIM3505-8 | SteadyWin GIM4305-10 | DAMIAO DM-J3507-2EC |
-|---|---|---|---|
-| 减速 | 8:1 行星 | 10:1 行星 | 7:1，类型未标明 |
-| 重量 | 84 g 裸机 / 97 g 含驱动 | 140 g 裸机 / 150 g 含驱动 | 150 g，驱动集成 |
-| 尺寸 | 未查到 | Ø53×26 mm | Ø46×37.9 mm |
-| 额定扭矩 | 0.65–0.67 Nm | ~1.0 Nm | 0.8 Nm |
-| 堵转/峰值扭矩 | 1.27 Nm（GDS34）/ 1.79 Nm（GDZ34） | 3.47–3.82 Nm | 3 Nm |
-| 峰值扭矩/重量（含驱动） | ~13–18 Nm/kg | ~23–25 Nm/kg | ~20 Nm/kg |
-| 转速 | 额定 ~234–300 rpm | 额定 ~300 rpm，最高 366–402 rpm | 额定 150 rpm，空载 460 rpm |
-| 背隙 | 15 arcmin | 15 arcmin | 未公布 |
-| 编码器 | 14-bit | 14-bit，可选外接第二编码器 | 双 14-bit，输出端单圈绝对 |
-| 通信 | CAN | CAN | CAN 1 Mbps（MIT/速度/位置模式）+ UART |
-| 价格 | 未查到 | 裸机 ~$70，含驱动 $115–125 | ~$120 |
-| 已知使用 | ALOHA 配件、小四足 | Stanford Pupper V3 | — |
-
-注意：
-- GIM3505 的 1.5 kg 应该是包装重量，实际是 84/97 g。它的扭矩各处标的不一致，老版本只有 0.43/0.85 Nm。
-- SteadyWin 标的是“堵转扭矩”，DAMIAO 标的是“峰值扭矩”，口径可能不同，不能直接横比。
-- 数据大多来自经销商页面，没有找到官方 datasheet。
-
-Sources:
-- [GIM3505-8（openelab）](https://openelab.io/products/steadywin-gim3505-8-planetary-gear-motor)
-- [GIM3505-8（rcdrone）](https://rcdrone.top/products/steadywin-gim3505-8-planetary-reducer-servo-motor)
-- [GIM3505-8 旧版手册](https://manuals.plus/ae/1005006647908292)
-- [GIM4305-10 安装手册](https://manuals.plus/steadywin/gim4305-10shs-planetary-reducer-servo-motor-manual)
-- [GIM4305-10（aifitlab）](https://aifitlab.com/products/steadywin-gim4305-planetary-reducer-servo-motor)
-- [Pupper V3 specs](https://pupper-v3-documentation.readthedocs.io/en/latest/learn_more/tech_specs.html)
-- [DM-J3507-2EC（aifitlab）](https://aifitlab.com/products/damiao-dm-j3507-2ec-motor)
-- [DM-J3507-2EC（roboticscenter）](https://www.roboticscenter.ai/ar/store/product/damiao-dm-j3507-2ec)
+---
 
 
-## 模型对比 viewer
+| 尚未覆盖的内容          | `docs` 中的具体含义                                                                                                                          | 在新架构中的位置                                                  | Pere comment              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------- |
+| **任务集本身如何修正**    | 野外结果 → 证据 → 更新设计目标；每条目标要能追溯来源，或标记为假设。[来源](/home/admin/Workspace/chihuahua/docs/SURVIVAL_TO_DESIGN_GOALS.md)                            | README 固定了任务集，还没有覆盖如何验证这些任务确实代表 wild survival。            | 3K tasks 定义 wild survival |
+| **行为风格目标**       | ADM 动作先验、动物动作数据 retargeting、行为 embedding，以及与 Chihuahua 行为分布的距离。[来源](/home/admin/Workspace/chihuahua/docs/adm_geometry_optimization.md) | 当前 Task / Reward 没有明确包含“行为像 Chihuahua”。这是额外目标，是否保留需要单独决定。 | ADM 是什么?                  |
+| **完整质量与供电模型**    | 电池、驱动器、线束、电子设备、紧固件、轴承的质量、空间和安装位置；更新 COM／惯量。[来源 (line 195)](/home/admin/Workspace/chihuahua/docs/TOP_LEVEL_DESIGN.md:195)               | 应进入 geometry／actuator 的物理模型，否则优化遗漏整机成本。                   | merge docs 中的content      |
+| **材料与制造约束**      | FDM 各向异性、层间强度、疲劳、打印方向、最小壁厚、装配公差，以及试样校准。[来源 (line 143)](/home/admin/Workspace/chihuahua/docs/TOP_LEVEL_DESIGN.md:143)                   | README 的 `material` 尚未展开这些变量和约束。                          | merge docs 中的content      |
+| **传动与关节架构**      | 串／并联弹性、机械限位、离合／制动、回驱、冲击承受能力、可变刚度；近端驱动与远端轻量化。[来源](/home/admin/Workspace/chihuahua/docs/yellowstone.md)                                  | 当前 actuator 连续松弛主要描述选型；这些机构参数是否一起优化尚未定义。                  | good point.               |
+| **形态搜索范围**       | 可控刚度脊柱、肩带活动、骨盆与脊柱的载荷传递。[来源](/home/admin/Workspace/chihuahua/docs/spine.md)                                                             | `geometry` 到底只优化固定拓扑的尺寸，还是允许关节拓扑／自由度变化，目前没有说明。            | `脊柱、肩带活动、骨盆与脊柱` 都无法实现, 太重 |
+| **复杂地形与拒绝／恢复行为** | 不平地面、坡度、台阶、摩擦、落脚点选择，以及危险地形拒绝进入与恢复。[来源](/home/admin/Workspace/chihuahua/docs/STAGE_5_COMPLEX_TERRAIN_IK.md)                             | 可以归入任务集、环境分布和评估条件；PoC 当前只有地面。                             | defined in 3K tasks       |
+| **每轮可追溯记录**      | 设计版本、物理假设、质量／惯量、载荷、FEM 结果、控制限制和下一步设计决定。[来源 (line 581)](/home/admin/Workspace/chihuahua/docs/TOP_LEVEL_DESIGN.md:581)                   | 三层优化需要统一的实验记录，才能重现和比较结果。                                  | not a big deal            |
 
-`uv run python pygame_mass_viewer.py --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
-窗口内按 `1/2/3/4` 切换 Chihuahua / Go2 / Aibo ERS-7 / Pupper v3；Go2 和 Aibo 保留 URDF 拓扑，关节角度遵守 URDF 限位。
-`B` 全身转动，`M` 单关节，`N` 或 `[/]` 选关节，左右键或横拖关节行调角；`空格` 暂停，`0` 零姿态，`F` 居中，`V` 切换 mesh 包围盒。
-模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](models/README.md)。
+旧文档有几处需要和新方向明确划界:
+
+- **FEM 范围与载荷来源**：旧文档要求整机 FEM，原生工况来自 Stage 1 自由空间 torque replay，排除重力／接触。新版采用 MuJoCo snapshot，需要重新定义载荷传递、边界条件，以及是否继续坚持整机分析。[旧定义](/home/admin/Workspace/chihuahua/docs/STAGE_2_WHOLE_ROBOT_FEM.md)
+- **已有反馈接口的能力边界**：Stage 4 文档记录真实 MuJoCo 接触力，但写给 Stage 2 的反馈仍来自准静态支撑力 proxy，且没有自动施加到 FEM。新 README 的这条链仍是待实现目标。[接口说明 (line 111)](/home/admin/Workspace/chihuahua/docs/STAGE_4_MUJOCO_CONTACT.md:111)
+- **旧阶段顺序与优化方法**：旧路线按 FEM → IK → MuJoCo 分阶段推进；ADM 文档建议无梯度几何优化。它们需要标记为历史路线，避免与新的可微三层循环并列成为实施要求。
+- **旧 fallback 策略**：FEM 文档允许缺失 beam resultants 时退回位移推算应变。这与你现在要求的 fail loud 不一致，重构时需要明确处理。[记录 (line 423)](/home/admin/Workspace/chihuahua/docs/STAGE_2_OPENRADIOSS_FIRST_LIGHT.md:423)

@@ -1,5 +1,90 @@
 # Top-Level Design
 
+
+
+Boston Dynamics 有非常深的 robot locomotion know-how:
+
+硬件集成、控制、动态平衡、执行器、可靠性、实机调参、跌倒恢复、量产工程，世界顶级。强在：
+
+```text
+robot performs tasks
+robot remains stable
+robot survives commercial use
+robot carries payload
+robot navigates human terrain
+```
+
+传统 robotics 的“task”通常是外部指定的：
+
+```text
+go there
+inspect this
+carry that
+open door
+avoid obstacle
+return to dock
+```
+
+环境是被工程师定义的，奖励函数是被工程师写的，失败模式是被测试场景枚举的。
+
+---
+
+https://chiwuawua.com/
+
+`SURVIVAL_TO_DESIGN_GOALS.md` 很关键, 它把工程拉到“恢复一个智能动物继续生活的能力”。
+ **return-to-wild / return-to-hunt prosthetic animal architecture** 是 know-how。
+它是一个 living agent, 目标是:
+
+```text
+stay alive
+stay with pack / family
+seek food
+avoid danger
+learn household rules
+respond to social reward
+adapt to humans
+form attachment
+recover after injury
+keep behaving like itself
+```
+
+and
+
+```text
+生态 use case
+-> 生物行为需求
+-> 形态/脊柱/关节 architecture
+-> mass / torque / material / FEM / IK / MuJoCo
+-> 复杂地形 refusal / survival validation
+```
+and
+
+```text
+agency
+social intrinsic behavior
+learning loop
+wild survival
+human-life adaptation
+embodied continuity
+```
+
+
+intelligence 是生态和社会性的。
+`good boy / good girl` 是关系里的 reinforcement。
+它会观察人怎么生活，学什么时候靠近、什么时候让开、谁需要陪伴、哪里安全、哪里不能碰。
+
+life context -> embodied behavior -> social learning -> survival adaptation
+
+
+## 模型对比 viewer
+
+`uv run python pygame_mass_viewer.py --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
+窗口内按 `1/2/3/4` 切换 Chihuahua / Go2 / Aibo ERS-7 / Pupper v3；Go2 和 Aibo 保留 URDF 拓扑，关节角度遵守 URDF 限位。
+`B` 全身转动，`M` 单关节，`N` 或 `[/]` 选关节，左右键或横拖关节行调角；`空格` 暂停，`0` 零姿态，`F` 居中，`V` 切换 mesh 包围盒。
+模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](models/README.md)。
+
+
+
 ## 终极目标
 
 构建一只能够由 Bambu 系列 FDM 打印机制造主要结构件的机械四肢动物。
@@ -563,3 +648,5 @@ printing is not the first prototype
 ```
 
 只有当这些约束一起闭环，最终的 printed quadruped 才有机会不是一次性展示品，而是一个可以迭代、可以修、可以运动的机械动物。
+
+
