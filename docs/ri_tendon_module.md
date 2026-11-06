@@ -73,17 +73,17 @@ RI20 原厂：Ø25×14.5 mm，转子孔 Ø11.6；RI30 原厂：Ø38×14 mm，转
 
 官方文件、下载地址、图纸公差和SHA-256见 `vendor/README.md` 与 `vendor/sources.json`。
 
-重建：在仓库根目录执行 `uv run --with cadquery --with trimesh --with fast-simplification python -m src.components.tendon.build_cad`。依赖 CadQuery 2.8、OpenCascade 7.9、trimesh、fast-simplification。原厂几何未缩放；本版只增加自定义装配件。
+重建：在仓库根目录执行 `uv run --with cadquery --with trimesh --with fast-simplification python -m src.components.z_common.tendon.build_cad`。依赖 CadQuery 2.8、OpenCascade 7.9、trimesh、fast-simplification。原厂几何未缩放；本版只增加自定义装配件。
 
 ## Repository layout and commands
 
-Run from the repository root. Source code: `src/components/tendon/`.
+Run from the repository root. Source code: `src/components/z_common/tendon/`.
 Manufacturer drawings: `vendor/components/motor/` (including `sources.json`).
 Generated STEP, geometry, screenshots and review bundles: `artifacts/ri_tendon_module/`.
 
 ```bash
-uv run --with cadquery --with trimesh --with fast-simplification python -m src.components.tendon.build_cad
-uv run python -m src.components.tendon.publish_view --renderer /absolute/path/to/render.py
+uv run --with cadquery --with trimesh --with fast-simplification python -m src.components.z_common.tendon.build_cad
+uv run python -m src.components.z_common.tendon.publish_view --renderer /absolute/path/to/render.py
 ```
 
 The publisher requires an explicit renderer and all listed validation artifacts;

@@ -1,0 +1,99 @@
+import csv
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+import numpy as np
+
+from src.components.z_common import mass_model
+from src.components.c_fem import rod_model as rod_model
+REPO_ROOT = Path(__file__).resolve().parents[1]
+REQUIRED_OUTPUTS = {
+    "nodes.csv",
+    "members.csv",
+    "lumped_masses.csv",
+    "rod_model_summary.yaml",
+    "fem_whole_body_rods_poster.png",
+}
+
+
+class FemRodModelTest(unittest.TestCase):
+    def make_model(self):
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
+        catalog = mass_model.load_catalog(
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
+        )
+        source = rod_model.build_basic_motion_model(description, catalog, "test_rods", 0.0, 0.0)
+        return source, rod_model.build_whole_body_rod_model(source)
+
+    def test_rod_graph_is_whole_body_and_connected(self):
+        _source, rods = self.make_model()
+        names = {member.name for member in rods.members}
+
+        self.assertIn("waist_yaw_pitch", names)
+        self.assertIn("front_body_spine", names)
+        self.assertIn("rear_body_spine", names)
+        self.assertIn("front_left_upper", names)
+        self.assertIn("rear_right_toe", names)
+        self.assertIn("head_neck", names)
+        self.assertIn("head_upper_jaw", names)
+
+        connected = rod_model.connected_node_names(rods)
+        self.assertEqual(len(connected), len(rods.nodes))
+        self.assertEqual(len([node for node in rods.nodes if node.contact_candidate]), 4)
+
+    def test_mass_and_com_match_basic_motion_source(self):
+        source, rods = self.make_model()
+
+        self.assertAlmostEqual(rods.total_mass_kg, source.total_mass_kg, places=12)
+        np.testing.assert_allclose(rods.com_m, source.com_m, atol=1e-12)
+        self.assertGreater(rods.total_member_mass_kg, 0.0)
+        self.assertGreater(rods.total_lumped_mass_kg, 0.0)
+
+    def test_rod_graph_is_topology_only(self):
+        _source, rods = self.make_model()
+        state = rod_model.summary_dict(rods)["analysis_state"]
+
+        self.assertTrue(state["topology_only"])
+        self.assertFalse(state["gravity_applied"])
+        self.assertFalse(state["fixed_boundary_conditions_applied"])
+        self.assertFalse(state["support_reactions_applied"])
+        self.assertFalse(state["load_cases_applied"])
+        self.assertFalse(state["solved_deformation"])
+
+    def test_cli_generates_required_outputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            result = subprocess.run(
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m", "src.components.c_fem.rod_model",
+                    "--out-dir",
+                    str(out_dir),
+                    "--frames",
+                    "2",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for filename in REQUIRED_OUTPUTS:
+                self.assertTrue((out_dir / filename).is_file(), filename)
+
+            with (out_dir / "members.csv").open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertTrue(rows)
+            self.assertIn("length_m", rows[0])
+            self.assertTrue(all(float(row["length_m"]) > 0.0 for row in rows))
+
+
+if __name__ == "__main__":
+    unittest.main()

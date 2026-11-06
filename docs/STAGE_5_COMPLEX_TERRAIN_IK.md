@@ -1,9 +1,9 @@
 # Stage 5: Complex Terrain IK
 
-目标：在 Stage 1-4 已经完成 first-light 后，定义复杂地形上的 IK 和运动决策层。
+目标：在 Basic motion-4 已经完成 first-light 后，定义复杂地形上的 IK 和运动决策层。
 
-Stage 5 不是打印阶段，也不是继续堆 MuJoCo 功能。它把 Stage 1 的质量/力矩、
-Stage 2 的结构限制、Stage 3 的 IK/control scaffold、Stage 4 的 contact evidence
+Stage 5 不是打印阶段，也不是继续堆 MuJoCo 功能。它把 Basic motion 的质量/力矩、
+FEM 的结构限制、IK control 的 IK/control scaffold、MuJoCo 的 contact evidence
 合并成复杂地形下的可执行运动约束。
 
 ## 1. Scope
@@ -36,9 +36,9 @@ Stage 5 不覆盖：
 Stage 5 consumes:
 
 - `mass_model.py` outputs: mass, COM, torque margin, leg endpoint residuals
-- Stage 2 FEM limits: hot spots, deformation-sensitive poses, load-path limits
-- Stage 3 IK/control outputs: joint commands, trajectory primitives, safety limits
-- Stage 4 MuJoCo/contact outputs: contact candidates, support proxy, failure evidence
+- FEM FEM limits: hot spots, deformation-sensitive poses, load-path limits
+- IK/control outputs: joint commands, trajectory primitives, safety limits
+- MuJoCo/contact outputs: contact candidates, support proxy, failure evidence
 - terrain description: height samples, slope, step edges, friction assumption
 
 Terrain may start as a synthetic local height field. It does not need camera or
@@ -72,7 +72,7 @@ Expected outputs:
 
 Stage 5 is accepted when:
 
-- flat-ground commands remain compatible with Stage 3 and Stage 4
+- flat-ground commands remain compatible with IK control and MuJoCo
 - uneven terrain commands produce bounded IK residuals
 - every generated pose has torque margin evidence
 - every generated pose has COM/support evidence

@@ -1,20 +1,20 @@
-# Stage 2: Whole-Robot FEM
+# FEM: Whole-Robot FEM
 
 目标：用 **OpenRadioss** 建立 whole-robot FEM 迭代系统，让整机结构强度、刚度、质量、COM、惯量和力矩进入同一个闭环。
 
 这一阶段只做 whole-robot FEM。不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 分析路线。局部问题必须通过整机模型暴露、修改和复验。
 
-外部工具依赖记录在 `docs/EXTERNAL_DEPENDENCIES.md`。Stage 2 依赖 OpenRadioss、OpenRadioss result conversion 和 ParaView，但仓库不记录本机安装路径、环境变量或自动探测逻辑。
+外部工具依赖记录在 `docs/EXTERNAL_DEPENDENCIES.md`。FEM 依赖 OpenRadioss、OpenRadioss result conversion 和 ParaView，但仓库不记录本机安装路径、环境变量或自动探测逻辑。
 
 OpenRadioss 的本地 first-light 复现实验记录在 `docs/STAGE_2_OPENRADIOSS_FIRST_LIGHT.md`，包括 release 校验、官方 tensile example、Starter/Engine 运行、T01 转 CSV 和 GIF 可视化。
 
-当前 Stage 2 的第一份 Chihuahua-specific 输入模型来自 `pygame_mass_viewer.py`
+当前 FEM 的第一份 Chihuahua-specific 输入模型来自 `pygame_mass_viewer.py`
 同源拓扑：整机被抽象成 connected rod graph。生成入口是
-`stage2_rod_model.py`，输出 `nodes.csv`、`members.csv`、
+`rod_model.py`，输出 `nodes.csv`、`members.csv`、
 `lumped_masses.csv`、`rod_model_summary.yaml` 和杆系 GIF。
 
 ```bash
-uv run python -m src.components.stage2_rod_model --out-dir stage2_outputs/rod_model
+uv run python -m src.components.c_fem.rod_model --out-dir artifacts/fem/rod_model
 ```
 
 这个 rod model 仍然是整机模型：body、waist、hips、four legs、feet、neck
@@ -23,15 +23,15 @@ uv run python -m src.components.stage2_rod_model --out-dir stage2_outputs/rod_mo
 subassembly 分析。
 
 这一步只导出 topology、质量和 toe-node tags。toe 节点可以保留
-contact-candidate 语义，方便后续 MuJoCo/contact 阶段复用，但 Stage 2
+contact-candidate 语义，方便后续 MuJoCo/contact 阶段复用，但 FEM
 不施加 gravity、support reaction、ground contact 或 fixed boundary
 condition。
 
 OpenRadioss whole-body beam deck 由同一份 rod graph 生成：
 
 ```bash
-uv run python -m src.components.stage2_openradioss_deck \
-  --out-dir stage2_outputs/openradioss_beam_deck
+uv run python -m src.components.c_fem.openradioss_deck \
+  --out-dir artifacts/fem/openradioss_beam_deck
 ```
 
 这个 deck 使用 `/BEAM`、`/PROP/TYPE3`、`/PART`、`/MAT/LAW1` 和
@@ -40,19 +40,19 @@ feet、没有 support reaction、没有 external load。Engine file 只用于验
 Starter/Engine 链路能接收 whole-body beam deck，不产生设计结论。
 
 第一份 solved deformation FEM route 是 viewer-periodic whole-body rod
-motion case。当前默认 load policy 是 `stage1-torque-replay`：从同一帧
-`pygame_mass_viewer.py` / Stage 1 model 计算 joint torque rows，再把每个
+motion case。当前默认 load policy 是 `basic_motion-torque-replay`：从同一帧
+`pygame_mass_viewer.py` / Basic motion model 计算 joint torque rows，再把每个
 joint torque 写成 OpenRadioss `/CLOAD` equal-and-opposite nodal moment
 couple。
 
 ```bash
-uv run python -m src.components.stage2_openradioss_periodic_motion \
-  --out-dir stage2_outputs/openradioss_periodic_motion \
+uv run python -m src.components.c_fem.openradioss_periodic_motion \
+  --out-dir artifacts/fem/openradioss_periodic_motion \
   --solver-duration-ms 8 \
   --viewer-motion-seconds 0.005 \
   --target-element-length-mm 8 \
   --uniform-radius-mm 8 \
-  --control-policy stage1-torque-replay
+  --control-policy basic_motion-torque-replay
 ```
 
 这个 case 复用 `pygame_mass_viewer.py` 的 constrained periodic motion，
@@ -63,8 +63,8 @@ uv run python -m src.components.stage2_openradioss_periodic_motion \
 同一套 whole-body rod graph 会被切成 elementized `/BEAM` mesh，默认目标
 element length 是 `8 mm`，默认 beam section 是 uniform circular radius
 `8 mm`。25 个原始 whole-body joint nodes 都保留在 FEM mesh 里，并且语义上
-统一都是 joint nodes。`stage1-torque-replay` 不使用 `/IMPDISP`、不使用
-ghost target nodes、不使用 guide springs；pose samples 只用于计算 Stage 1
+统一都是 joint nodes。`basic_motion-torque-replay` 不使用 `/IMPDISP`、不使用
+ghost target nodes、不使用 guide springs；pose samples 只用于计算 Basic motion
 torque rows 和输出 reference CSV，不作为运动边界强推给 robot nodes。
 旧的 `uniform-joint-guides` 和 `all-joints-hard` 策略只作为对照/调试开关保留。
 
@@ -83,15 +83,15 @@ radius，可显式改变 `--uniform-radius-mm` / radius policy，但那属于对
 当前已验证的 whole-body torque replay run：
 
 ```text
-run dir: /mnt/s8t/openradioss/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam
-control policy: stage1-torque-replay
+run dir: /mnt/s8t/openradioss/runs/chihuahua_fem_basic_motion_torque_replay_radius12_8mm_native_beam
+control policy: basic_motion-torque-replay
 solver nodes: 305
 beam elements: 304
 beam resultant history elements: 304
 imposed displacement functions: 0
 concentrated moment functions: 76
-stage1 torque replay joints: 21
-stage1 torque replay moment couples: 22
+basic_motion torque replay joints: 21
+basic_motion torque replay moment couples: 22
 Starter: 0 errors, 0 warnings
 Engine: normal termination, 3233 cycles, 8.001 ms
 GIF: openradioss_whole_body_periodic_motion.gif
@@ -107,7 +107,7 @@ outer-fiber strain 约 `2.20e-4`，最大 outer-fiber stress 约 `0.703 MPa`。
 ## 1. FEM 输入模型
 
 - 读取 `vendor/reference/urdf/chihuahua/lists.md`
-- 读取 `pygame_mass_viewer.py` / Stage 1 linkage 同源生成的 whole-body rod graph
+- 读取 `pygame_mass_viewer.py` / Basic motion linkage 同源生成的 whole-body rod graph
 - 读取材料、打印方向、rod radius / mesh / lumped-mass 参数
 - 读取 actuator、battery、electronics 的 mass / COM / inertia / placement
 - 建立整机 structural model
@@ -126,14 +126,14 @@ outer-fiber strain 约 `2.20e-4`，最大 outer-fiber stress 约 `0.703 MPa`。
 
 ## 3. Load Case Schema
 
-- Stage 2 load case 来自 Stage 1 的质量、COM、惯量、姿态和 joint torque
+- FEM load case 来自 Basic motion 的质量、COM、惯量、姿态和 joint torque
   估计
-- Stage 2 不包含 gravity、ground contact、support reaction、fixed feet 或
+- FEM 不包含 gravity、ground contact、support reaction、fixed feet 或
   standing-static support solve
 - 每个 load case 记录：来源、单位、方向、施加载体、边界条件和姿态
 - 每个 load case 必须可回写 mass / COM / inertia / torque 更新后的新版本
 - MuJoCo/contact 阶段产生的 gravity/contact/support 结果，后续只能作为新输入
-  回灌 Stage 2；它们不属于当前 Stage 2 原生工况
+  回灌 FEM；它们不属于当前 FEM 原生工况
 
 核心 load cases：
 

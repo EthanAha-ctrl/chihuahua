@@ -1,23 +1,23 @@
-# Stage 3: IK And Control First Light
+# IK control: IK And Control First Light
 
-目标：把 Stage 1/2 形成的几何、质量和力矩模型接到控制侧，先建立一个
+目标：把 Basic motion/2 形成的几何、质量和力矩模型接到控制侧，先建立一个
 可测试的 IK / trajectory / safety scaffold。
 
-Stage 3 不做 MuJoCo，不做真实接触动力学，不求 ground reaction，不假设脚端
-真的能稳定支撑整机。MuJoCo/contact 是 Stage 4。
+IK control 不做 MuJoCo，不做真实接触动力学，不求 ground reaction，不假设脚端
+真的能稳定支撑整机。MuJoCo/contact 是 MuJoCo。
 
 ## Scope
 
-Stage 3 当前覆盖：
+IK control 当前覆盖：
 
 - 从脚端目标求 leg joint commands。
 - 生成简单 trajectory primitives。
 - 检查 joint limit margin。
-- 复用 Stage 1 mass / torque model 检查 continuous torque margin。
+- 复用 Basic motion mass / torque model 检查 continuous torque margin。
 - 用 COM 投影和支撑脚端多边形做几何级 support polygon awareness。
 - 输出 simulation-ready command tables，供后续 MuJoCo/export 使用。
 
-Stage 3 当前不覆盖：
+IK control 当前不覆盖：
 
 - gravity/contact dynamics
 - support reaction solve
@@ -30,8 +30,8 @@ Stage 3 当前不覆盖：
 ## Entry Point
 
 ```bash
-uv run python -m src.components.stage3_ik_control \
-  --out-dir stage3_outputs/ik_control \
+uv run python -m src.components.a_basic_motion.ik_control \
+  --out-dir artifacts/ik/ik_control \
   --primitive stand \
   --frame-count 5
 ```
@@ -43,15 +43,15 @@ joint_commands.csv
 foot_targets.csv
 trajectory_frames.csv
 control_safety_summary.csv
-stage3_ik_control_summary.yaml
+ik_ik_control_summary.yaml
 ```
 
 ## Pygame Visualization
 
-`pygame_mass_viewer.py` now includes a Stage 3 command overlay:
+`pygame_mass_viewer.py` now includes a IK control command overlay:
 
 ```bash
-uv run python -m src.components.pygame_mass_viewer
+uv run python -m src.components.a_basic_motion.pygame_mass_viewer
 ```
 
 The overlay shows 21 joint command bars:
@@ -86,11 +86,11 @@ visualization: no gravity, no contact, no support reaction.
 Useful options:
 
 ```bash
-uv run python -m src.components.pygame_mass_viewer \
-  --stage3-target-radius-min-m 0.18 \
-  --stage3-target-radius-max-m 0.34 \
-  --stage3-target-period-s 1.4 \
-  --stage3-arbitration-period-s 0.30
+uv run python -m src.components.a_basic_motion.pygame_mass_viewer \
+  --ik-target-radius-min-m 0.18 \
+  --ik-target-radius-max-m 0.34 \
+  --ik-target-period-s 1.4 \
+  --ik-arbitration-period-s 0.30
 ```
 
 The periodic baseline is recomputed every frame. Best-effector arbitration runs
@@ -100,7 +100,7 @@ overwritten until the next arbitration tick.
 ## Current Primitives
 
 `stand` keeps all four feet on their neutral targets. It should be safe under
-the current rough Stage 1 free-space torque model.
+the current rough Basic motion free-space torque model.
 
 `crawl_step` lifts one swing leg through a simple foot arc while the body frame
 stays fixed. It is intentionally a diagnostic primitive: without body shift, some
@@ -124,42 +124,42 @@ failure reasons
 A frame is safe only if:
 
 - IK residual is below the configured tolerance.
-- Stage 1 continuous torque margin is above the configured threshold.
+- Basic motion continuous torque margin is above the configured threshold.
 - All command angles retain the configured joint-limit margin.
 - COM projection is inside the support polygon made by support feet.
 
-This is still a control-side prefilter. A Stage 3 safe frame is not a proof that
+This is still a control-side prefilter. A IK control safe frame is not a proof that
 the robot can stand or walk in the world; it only means the command survived the
 current IK / torque / geometric support checks.
 
-## Relationship To Stage 1 And Stage 2
+## Relationship To Basic motion And FEM
 
-Stage 3 reuses:
+IK control reuses:
 
 - `vendor/reference/urdf/chihuahua/lists.md` as the geometry and joint-range source.
-- `mass_model.py` for Stage 1 mass, COM and free-space torque rows.
+- `mass_model.py` for Basic motion mass, COM and free-space torque rows.
 - The same leg and head chain conventions used by `pygame_mass_viewer.py`.
 
-Stage 3 should feed later iterations:
+IK control should feed later iterations:
 
 ```text
 IK/control unsafe pose
  -> update foot targets / gait primitive / joint limits
- -> update Stage 1 torque estimate
- -> update Stage 2 torque-replay load case if needed
- -> later validate in Stage 4 MuJoCo/contact
+ -> update Basic motion torque estimate
+ -> update FEM torque-replay load case if needed
+ -> later validate in MuJoCo/contact
 ```
 
 ## Acceptance
 
-The Stage 3 first-light acceptance command is:
+The IK control first-light acceptance command is:
 
 ```bash
-uv run python -m unittest tests/test_stage3_ik_control.py
+uv run python -m unittest ci/test_ik_control.py
 ```
 
 The full repo test suite should also pass:
 
 ```bash
-uv run python -m unittest discover -s tests
+uv run python -m unittest discover -s ci
 ```

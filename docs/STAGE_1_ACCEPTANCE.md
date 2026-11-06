@@ -1,12 +1,12 @@
-# Stage 1 Acceptance
+# Basic motion Acceptance
 
-Stage 1 is accepted as a rough free-motion mass and torque body. It is a
+Basic motion is accepted as a rough free-motion mass and torque body. It is a
 structured checkpoint for early design iteration, not a controller, contact
 model, FEM model, MuJoCo model, or printable CAD validation.
 
 ## Acceptance Scope
 
-Stage 1 currently covers:
+Basic motion currently covers:
 
 - Read `vendor/components/material/lists.md`, `vendor/components/joint/lists.md`, and `vendor/components/battery/lists.md`.
 - Build a rough rigid body mass model from the current endpoint geometry.
@@ -15,10 +15,10 @@ Stage 1 currently covers:
   head-claw joints.
 - Output fixed-world foot target residuals, including requested and solved toe
   endpoints per leg.
-- Use the same Stage 1 model for the mass viewer pose and telemetry.
+- Use the same Basic motion model for the mass viewer pose and telemetry.
 - Place battery and electronics by explicit `mount_frame` values:
   `rear`, `waist`, or `front`.
-- Keep the head/neck anchor on the upper body: Stage 1 has no head/neck root
+- Keep the head/neck anchor on the upper body: Basic motion has no head/neck root
   offset, and `neck_origin == body_anchor` is intentional.
 
 ## Required Outputs
@@ -26,7 +26,7 @@ Stage 1 currently covers:
 Running:
 
 ```bash
-uv run python -m src.components.mass_model --out-dir /tmp/chihuahua_stage1_acceptance
+uv run python -m src.components.z_common.mass_model --out-dir /tmp/chihuahua_basic_motion_acceptance
 ```
 
 must produce:
@@ -45,7 +45,7 @@ toe endpoint, residual, hip, knee, and toe-joint coordinates.
 
 ## Explicitly Out Of Scope
 
-Stage 1 does not include:
+Basic motion does not include:
 
 - Gravity torque.
 - Foot contact reaction.
@@ -61,6 +61,6 @@ Stage 1 does not include:
 Both commands must pass:
 
 ```bash
-uv run python -m unittest tests/test_stage1_acceptance.py
-uv run python -m src.components.mass_model --out-dir /tmp/chihuahua_stage1_acceptance
+uv run python -m unittest ci/test_basic_motion_acceptance.py
+uv run python -m src.components.z_common.mass_model --out-dir /tmp/chihuahua_basic_motion_acceptance
 ```

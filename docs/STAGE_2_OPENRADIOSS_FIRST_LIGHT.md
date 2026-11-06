@@ -1,7 +1,7 @@
-# Stage 2 OpenRadioss First Light
+# FEM OpenRadioss First Light
 
 本文档记录第一次 OpenRadioss 本地复现实验。目标不是求解 Chihuahua
-整机结构，而是确认 Stage 2 的外部 solver 链路真的可用：
+整机结构，而是确认 FEM 的外部 solver 链路真的可用：
 
 ```text
 download OpenRadioss
@@ -221,7 +221,7 @@ After the CSV exists, generate a visual first-light artifact from this repo:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python -m src.components.fem_tools.openradioss_tensile_gif \
+uv run python -m src.components.c_fem.fem_tools.openradioss_tensile_gif \
   --run-dir "$OR_ROOT/runs/tensile_section1/1_LAW2"
 ```
 
@@ -242,7 +242,7 @@ displacement reconstruction.
 
 ## Why This Matters
 
-This run proves the Stage 2 toolchain can already do the essential loop:
+This run proves the FEM toolchain can already do the essential loop:
 
 ```text
 OpenRadioss Starter
@@ -256,15 +256,15 @@ The next Chihuahua-specific FEM milestone should be the viewer-derived
 whole-body rod model, not a single-part or subassembly FEM route:
 
 ```text
-pygame_mass_viewer.py / Stage 1 MassModel topology
+pygame_mass_viewer.py / Basic motion MassModel topology
 -> connected body + waist + hips + legs + feet + neck + head rods
 -> lump actuator, battery, electronics, and foot-pad masses
 -> OpenRadioss whole-robot beam / rod deck
--> Stage 2 load cases replay Stage 1 torque / inertia without gravity or contact
+-> FEM load cases replay Basic motion torque / inertia without gravity or contact
 -> CSV and FEM visualization artifacts
 ```
 
-Only after that should Stage 2 graduate to whole-robot OpenRadioss case
+Only after that should FEM graduate to whole-robot OpenRadioss case
 generation.
 
 ## Chihuahua Whole-Body Beam Deck Smoke Run
@@ -273,15 +273,15 @@ The first Chihuahua-specific OpenRadioss deck generator is:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python -m src.components.stage2_openradioss_deck \
-  --out-dir "$OR_ROOT/runs/chihuahua_stage2_whole_body_beam"
+uv run python -m src.components.c_fem.openradioss_deck \
+  --out-dir "$OR_ROOT/runs/chihuahua_fem_whole_body_beam"
 ```
 
 It exports a topology-only whole-body beam deck:
 
 ```text
-stage2_whole_body_beam_0000.rad
-stage2_whole_body_beam_0001.rad
+fem_whole_body_beam_0000.rad
+fem_whole_body_beam_0001.rad
 openradioss_beam_deck_summary.yaml
 openradioss_whole_body_beam_deck.gif
 openradioss_whole_body_beam_deck_poster.png
@@ -293,17 +293,17 @@ It has no gravity, no fixed feet, no support reaction, and no external load.
 Run the smoke check:
 
 ```bash
-cd "$OR_ROOT/runs/chihuahua_stage2_whole_body_beam"
+cd "$OR_ROOT/runs/chihuahua_fem_whole_body_beam"
 
 "$OPENRADIOSS_PATH/exec/starter_linux64_gf" \
-  -i stage2_whole_body_beam_0000.rad \
+  -i fem_whole_body_beam_0000.rad \
   -np 1 | tee starter.log
 
 "$OPENRADIOSS_PATH/exec/engine_linux64_gf" \
-  -i stage2_whole_body_beam_0001.rad | tee engine.log
+  -i fem_whole_body_beam_0001.rad | tee engine.log
 
 "$OPENRADIOSS_PATH/exec/th_to_csv_linux64_gf" \
-  stage2_whole_body_beamT01 | tee th_to_csv.log
+  fem_whole_body_beamT01 | tee th_to_csv.log
 ```
 
 The first successful smoke run produced:
@@ -311,7 +311,7 @@ The first successful smoke run produced:
 ```text
 Starter: NORMAL TERMINATION, 0 ERROR(S), 0 WARNING(S)
 Engine: NORMAL TERMINATION, TOTAL NUMBER OF CYCLES: 4
-T01 CSV: stage2_whole_body_beamT01.csv
+T01 CSV: fem_whole_body_beamT01.csv
 OpenRadioss deck mass: 2.492834 kg
 ```
 
@@ -322,14 +322,14 @@ gravity, support, contact, deformation, stress, or design-margin result.
 
 The first solved whole-body rod deformation case is generated from the same
 `pygame_mass_viewer.py` periodic motion sampler. The current default solved
-route is Stage 1 torque replay: per-frame Stage 1 joint torque rows are written
+route is Basic motion torque replay: per-frame Basic motion joint torque rows are written
 as equal-and-opposite OpenRadioss `/CLOAD` nodal moment couples. The sampled
 viewer pose is a torque/reference source, not a hard motion boundary.
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python -m src.components.stage2_openradioss_periodic_motion \
-  --out-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam" \
+uv run python -m src.components.c_fem.openradioss_periodic_motion \
+  --out-dir "$OR_ROOT/runs/chihuahua_fem_basic_motion_torque_replay_radius12_8mm_native_beam" \
   --samples 25 \
   --solver-duration-ms 8 \
   --viewer-start-seconds 0.2 \
@@ -337,25 +337,25 @@ uv run python -m src.components.stage2_openradioss_periodic_motion \
   --motion-scale 1.0 \
   --target-element-length-mm 8 \
   --uniform-radius-mm 12 \
-  --control-policy stage1-torque-replay \
+  --control-policy basic_motion-torque-replay \
   --no-preview-gif
 ```
 
 Run OpenRadioss from the case directory so result files stay with the case:
 
 ```bash
-cd "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam"
+cd "$OR_ROOT/runs/chihuahua_fem_basic_motion_torque_replay_radius12_8mm_native_beam"
 
 "$OPENRADIOSS_PATH/exec/starter_linux64_gf" \
-  -i stage2_whole_body_periodic_motion_0000.rad \
+  -i fem_whole_body_periodic_motion_0000.rad \
   | tee starter.log
 
 "$OPENRADIOSS_PATH/exec/engine_linux64_gf" \
-  -i stage2_whole_body_periodic_motion_0001.rad \
+  -i fem_whole_body_periodic_motion_0001.rad \
   | tee engine.log
 
 "$OPENRADIOSS_PATH/exec/th_to_csv_linux64_gf" \
-  stage2_whole_body_periodic_motionT01 \
+  fem_whole_body_periodic_motionT01 \
   | tee th_to_csv.log
 ```
 
@@ -363,8 +363,8 @@ Render the native beam-resultant strain GIF from T01:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python -m src.components.stage2_openradioss_periodic_motion \
-  --out-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam" \
+uv run python -m src.components.c_fem.openradioss_periodic_motion \
+  --out-dir "$OR_ROOT/runs/chihuahua_fem_basic_motion_torque_replay_radius12_8mm_native_beam" \
   --samples 25 \
   --solver-duration-ms 8 \
   --viewer-start-seconds 0.2 \
@@ -372,7 +372,7 @@ uv run python -m src.components.stage2_openradioss_periodic_motion \
   --motion-scale 1.0 \
   --target-element-length-mm 8 \
   --uniform-radius-mm 12 \
-  --control-policy stage1-torque-replay \
+  --control-policy basic_motion-torque-replay \
   --no-preview-gif \
   --result-frames 36 \
   --result-duration-ms 90
@@ -388,19 +388,19 @@ Solver nodes: 305
 Beam elements: 304
 Beam resultant history columns: 304 elements x F1/M2/M3
 Prescribed displacement functions: 0
-Control policy: stage1-torque-replay
+Control policy: basic_motion-torque-replay
 Uniform guided joint nodes: 0
 Hard prescribed robot joint nodes: 0
-Stage 1 torque replay samples: 550
-Stage 1 torque replay joints: 21
-Stage 1 torque replay moment couples: 22
+Basic motion torque replay samples: 550
+Basic motion torque replay joints: 21
+Basic motion torque replay moment couples: 22
 Concentrated moment functions: 76
 Uniform radius: 12 mm
 Max target displacement: 9.47419 mm
-Torque replay CSV: stage1_torque_replay_loads.csv
-T01 CSV: stage2_whole_body_periodic_motionT01.csv
-H3D: stage2_whole_body_periodic_motion.h3d
-Animation A-files: stage2_whole_body_periodic_motionA001..A019
+Torque replay CSV: basic_motion_torque_replay_loads.csv
+T01 CSV: fem_whole_body_periodic_motionT01.csv
+H3D: fem_whole_body_periodic_motion.h3d
+Animation A-files: fem_whole_body_periodic_motionA001..A019
 GIF: openradioss_whole_body_periodic_motion.gif
 Poster: openradioss_whole_body_periodic_motion_poster.png
 ```
@@ -411,10 +411,10 @@ torque-replay FEM motion case: a second-scale viewer period is sampled at
 inside an `8 ms` FEM window. The deck has no `/IMPDISP`, no ghost target nodes,
 and no guide springs in this policy. The native beam-resultant GIF should therefore show
 almost no gross rotation; it should primarily expose the element tension/bend
-map caused by Stage 1 torque replay.
+map caused by Basic motion torque replay.
 
 All 25 original whole-body joint nodes are preserved in the solver mesh. The
-applied loads come from 21 Stage 1 torque rows: waist yaw/pitch, four leg
+applied loads come from 21 Basic motion torque rows: waist yaw/pitch, four leg
 chains, neck yaw/pitch, and head claw. Each torque row is mapped to a proximal
 and distal node pair with equal-and-opposite moment components in global
 `XX`, `YY`, and `ZZ`. The old `uniform-joint-guides` and `all-joints-hard`
@@ -434,7 +434,7 @@ radius for every beam element; body, waist, leg, toe, and head members do not
 have different section radii in this case. FEM result colors use the red half of
 the same `seismic` colormap family as `pygame_mass_viewer.py` joint torque
 colors: white is zero and red is hotter absolute outer-fiber strain. The pygame
-viewer can additionally overlay the Stage 1 torque replay CSV as applied
+viewer can additionally overlay the Basic motion torque replay CSV as applied
 moment-couple glyphs; those glyphs use the full `seismic` joint-torque scale.
 
 For this radius-12-mm native beam-resultant run, the poster frame was at about
@@ -448,8 +448,8 @@ For interactive inspection, use the pygame viewer instead of a pre-rendered GIF:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python -m src.components.pygame_openradioss_fem_viewer \
-  --run-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam"
+uv run python -m src.components.c_fem.pygame_openradioss_fem_viewer \
+  --run-dir "$OR_ROOT/runs/chihuahua_fem_basic_motion_torque_replay_radius12_8mm_native_beam"
 ```
 
 The viewer uses the same T01 displacement history as the generated deck. It
@@ -459,7 +459,7 @@ The beam radius remains recorded in the panel and in the deck, but the
 interactive view is a mesh-element wireframe for readability. On new runs, its
 FEM colors use Radioss beam `F1/M2/M3` outer-fiber strain. On older runs without
 beam resultants, it falls back to displacement-derived strain proxy. By default,
-the viewer also reads `stage1_torque_replay_loads.csv` and overlays the
+the viewer also reads `basic_motion_torque_replay_loads.csv` and overlays the
 current-frame applied joint torque as equal-and-opposite proximal/distal moment
 glyphs. Press `t` to hide or show that overlay.
 

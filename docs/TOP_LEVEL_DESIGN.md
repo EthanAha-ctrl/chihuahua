@@ -78,7 +78,7 @@ life context -> embodied behavior -> social learning -> survival adaptation
 
 ## 模型对比 viewer
 
-`uv run python -m src.components.pygame_mass_viewer --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
+`uv run python -m src.components.a_basic_motion.pygame_mass_viewer --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
 窗口内按 `1/2/3/4` 切换 Chihuahua / Go2 / Aibo ERS-7 / Pupper v3；Go2 和 Aibo 保留 URDF 拓扑，关节角度遵守 URDF 限位。
 `B` 全身转动，`M` 单关节，`N` 或 `[/]` 选关节，左右键或横拖关节行调角；`空格` 暂停，`0` 零姿态，`F` 居中，`V` 切换 mesh 包围盒。
 模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](vendor/reference/urdf/README.md)。
@@ -247,7 +247,7 @@ post-processing assumptions
 
 打印方向会影响强度，它参与 FEM 和 CAD 迭代。
 
-## Stage 1: Free-Motion Mass And Torque Body
+## Basic motion: Free-Motion Mass And Torque Body
 
 把当前关节几何展开成带有 mass、COM、inertia 和 torque limit 的 free-motion rigid body model。
 
@@ -287,16 +287,16 @@ battery 放在哪里 COM 最合理？
 
 这一阶段应该允许粗略 geometry placeholders，但 mass、COM 和 torque 数据必须结构化。
 
-## Stage 2: Whole-Robot FEM
+## FEM: Whole-Robot FEM
 
 以整只机器人作为唯一 FEM 分析对象。
 
 这一阶段不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 路线。局部区域可以在整机结果中表现为 stress / deformation hot spot，但判断、加强和复验都回到 whole-robot FEM 中完成。
 
-Stage 2 FEM load case 应来自阶段 1 的质量、惯量、姿态和 joint torque
+FEM FEM load case 应来自阶段 1 的质量、惯量、姿态和 joint torque
 估计，但这一阶段不引入 gravity、ground contact、support reaction 或
 fixed feet。重力、接触和支撑稳定性属于后续 MuJoCo/contact 阶段；MuJoCo
-结果再回灌 Stage 2，生成新的无重力结构复验工况。
+结果再回灌 FEM，生成新的无重力结构复验工况。
 
 ```text
 max joint torque
@@ -305,7 +305,7 @@ worst-case pose
 actuator / battery lumped mass inertia
 waist yaw / pitch extreme pose
 torque replay articulated bend
-motion-slice inertial load from Stage 1
+motion-slice inertial load from Basic motion
 mesh / material / radius comparison under the same torque replay
 ```
 
@@ -364,15 +364,15 @@ whole-robot FEM stress / deformation hot spot
  -> whole-robot FEM again
 ```
 
-## Stage 3: IK And Control Development
+## IK control: IK And Control Development
 
 当 mass、torque 和整机结构经过几轮 FEM 后，开始加入 IK 和控制。
 
 早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
 
-Stage 3 first-light 记录在 `docs/STAGE_3_IK_CONTROL.md`。当前实现先建立
+IK control first-light 记录在 `docs/STAGE_3_IK_CONTROL.md`。当前实现先建立
 IK、trajectory primitive、torque margin checker 和几何级 support polygon
-awareness；MuJoCo/contact 仍属于 Stage 4。
+awareness；MuJoCo/contact 仍属于 MuJoCo。
 
 核心能力：
 
@@ -408,13 +408,13 @@ control-side safety limits
 simulation-ready actuator commands
 ```
 
-## Stage 4: CAD And Control In MuJoCo
+## MuJoCo: CAD And Control In MuJoCo
 
 把经过阶段 1-3 迭代的 CAD / rigid body / control 放进 MuJoCo。
 
-Stage 4 first-light 记录在 `docs/STAGE_4_MUJOCO_CONTACT.md`。当前实现先建立
+MuJoCo first-light 记录在 `docs/STAGE_4_MUJOCO_CONTACT.md`。当前实现先建立
 MuJoCo XML export、foot contact geometry、准静态支撑反力 proxy 和
-Stage 2 feedback load-case table；闭环 balance 和真实动态步态仍是后续工作。
+FEM feedback load-case table；闭环 balance 和真实动态步态仍是后续工作。
 
 MuJoCo 模型需要包含：
 
@@ -477,10 +477,10 @@ COM 如何留在可恢复区域？
 Stage 5 的核心输入：
 
 ```text
-Stage 1 mass / COM / torque margin
-Stage 2 FEM hot spots and load-path limits
-Stage 3 IK / control safety limits
-Stage 4 MuJoCo contact and failure evidence
+Basic motion mass / COM / torque margin
+FEM FEM hot spots and load-path limits
+IK control IK / control safety limits
+MuJoCo contact and failure evidence
 terrain height samples / slope / step edges
 foot friction assumptions
 support polygon / contact candidate set
@@ -606,7 +606,7 @@ next design decision
 3. Add link mass and COM calculation.
 4. Add static torque estimation for representative poses.
 5. Add versioned design reports.
-6. Document external Stage 2 FEM dependencies.
+6. Document external FEM FEM dependencies.
 7. Prepare whole-robot FEM export / load-case generation.
 8. Define complex terrain IK stage before printing.
 9. Later prepare printing implementation.
