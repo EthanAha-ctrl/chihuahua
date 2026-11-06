@@ -121,6 +121,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Obsidian workspace settings
+/.obsidian/
+/docs/.obsidian/
+
 # Chihuahua project specific outputs
 endpoint_outputs/
 stage2_outputs/

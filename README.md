@@ -12,55 +12,6 @@ With that we'll be able to get an quadrupedal robot that is highly optimized for
 
 To make it happen, the project comes in multiple phases.
 
-## Code layout
-
-```text
-src/
-  components/             # Phase 1: reusable components
-    tendon/               # CAD assembly study
-    model_tools/          # Reference model audits and rendering
-    fem_tools/            # FEM result visualization
-    plot_actuator_mass_torque.py
-    dog_description.py
-    endpoint_geometry.py
-    mass_model.py
-    urdf_linkage.py
-    pygame_endpoint_viewer.py
-    pygame_mass_viewer.py
-    stage3_ik_control.py
-    stage4_mujoco_contact.py
-    view_mujoco.py
-    stage2_rod_model.py
-    stage2_openradioss_deck.py
-    stage2_openradioss_periodic_motion.py
-    stage2_mesh_convergence.py
-    pygame_openradioss_fem_viewer.py
-  theloop/                # Phase 2: optimization orchestration
-    innerloop.py          # Controller training for a fixed design
-    midloop.py            # Geometry/material optimization with FEM feedback
-    outerloop.py          # Discrete actuator search, no gradient
-```
-
-Existing component filenames retain their historical stage numbers during the
-folder reorganization. Human action annotation and task/reward/RL components
-are not implemented yet. Loop entry points currently raise `NotImplementedError`.
-Configuration inputs are Markdown tables in the component and reference directories.
-
-Reference URDFs and their runtime metadata live in `vendor/reference/urdf/`.
-Manufacturer motor drawings live in `vendor/components/motor/`.
-Generated CAD, model review images, and MuJoCo output live under `artifacts/`
-and are ignored by Git. Published documentation figures remain in `docs/`.
-Tests remain in `tests/`.
-
-Run components from the repository root as Python modules:
-
-```bash
-uv run python -m src.components.pygame_mass_viewer
-uv run python -m src.components.view_mujoco
-uv run python -m src.components.mass_model --out-dir /tmp/chihuahua_stage1
-uv run python -m unittest discover -s tests
-```
-
 ## Phase 1, proof of concept
 
 Get parts ready:
