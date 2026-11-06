@@ -135,3 +135,6 @@ MUJOCO_LOG.TXT
 # Temporary artifacts
 /artifacts/*
 !/artifacts/.gitkeep
+
+# Locally installed external tools
+/.tools/

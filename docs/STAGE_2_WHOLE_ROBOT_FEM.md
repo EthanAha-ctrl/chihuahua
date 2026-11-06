@@ -4,7 +4,6 @@
 
 这一阶段只做 whole-robot FEM。不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 分析路线。局部问题必须通过整机模型暴露、修改和复验。
 
-外部工具依赖记录在 `docs/EXTERNAL_DEPENDENCIES.md`。FEM 依赖 OpenRadioss、OpenRadioss result conversion 和 ParaView，但仓库不记录本机安装路径、环境变量或自动探测逻辑。
 
 OpenRadioss 的本地 first-light 复现实验记录在 `docs/STAGE_2_OPENRADIOSS_FIRST_LIGHT.md`，包括 release 校验、官方 tensile example、Starter/Engine 运行、T01 转 CSV 和 GIF 可视化。
 

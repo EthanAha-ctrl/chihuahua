@@ -1,0 +1,31 @@
+platform = "linux-x86_64"
+bootstrap_python = ">=3.11"
+
+[tools.uv]
+version = "0.11.7"
+url = "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-x86_64-unknown-linux-gnu.tar.gz"
+sha256 = "6681d691eb7f9c00ac6a3af54252f7ab29ae72f0c8f95bdc7f9d1401c23ea868"
+archive = "uv-0.11.7.tar.gz"
+format = "tar.gz"
+root = "uv-x86_64-unknown-linux-gnu"
+executables = ["uv", "uvx"]
+check = ["uv", "--version"]
+
+[tools.openradioss]
+version = "latest-20260728"
+url = "https://github.com/OpenCourant/extlib/releases/download/upstream-latest-20260728-linux64/OpenRadioss_linux64.zip"
+sha256 = "598ed7b2905a7bacc8d1781470c250ac79d7558c39ba962768edf3644644fe33"
+archive = "openradioss.zip"
+format = "zip"
+root = "OpenRadioss"
+executables = ["exec/starter_linux64_gf", "exec/engine_linux64_gf", "exec/anim_to_vtk_linux64_gf", "exec/th_to_csv_linux64_gf"]
+
+[tools.paraview]
+version = "5.13.3"
+url = "https://www.paraview.org/files/v5.13/ParaView-5.13.3-MPI-Linux-Python3.10-x86_64.tar.gz"
+sha256 = "2fd7cb3e1155576e3ed56a4a238bdf1b523b7e85611b90f4437c66fb2908ddc8"
+archive = "paraview.tar.gz"
+format = "tar.gz"
+root = "ParaView-5.13.3-MPI-Linux-Python3.10-x86_64"
+executables = ["bin/paraview", "bin/pvpython", "bin/pvbatch"]
+check = ["bin/pvpython", "--version"]
