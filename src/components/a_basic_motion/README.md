@@ -1,10 +1,38 @@
+减速机构采用 off-the-shelf。选厂家已经匹配并装配好的电机、减速器与轴承总成.
+1.5 kg 整机、每腿四个主动自由度和躯干集中驱动的目标.
+
+
+By the tasks defined in `e_task_reward_rl`, 可能的options 有：
+
+```text
+semi-flexible thoracolumbar spine
+strong lumbosacral region
+mobile scapula / shoulder girdle
+pelvis-spine load transfer
+limited torsion + useful flexion/extension
+high stiffness when biting / pulling
+high mobility when running / turning / denning
+```
+
+
+Run from the repository root. Source code: `src/components/z_common/tendon/`.
+Manufacturer drawings: `vendor/components/motor/` (including `sources.json`).
+Generated STEP, geometry, screenshots and review bundles: `artifacts/ri_tendon_module/`.
+
+```bash
+uv run --with cadquery --with trimesh --with fast-simplification python -m src.components.z_common.tendon.build_cad
+uv run python -m src.components.z_common.tendon.publish_view --renderer /absolute/path/to/render.py
+```
+
+The publisher requires an explicit renderer and all listed validation artifacts;
+missing inputs are errors. CAD rebuild was verified with the command above;
+the obsolete local CAD environment has been removed.
+
 # Basic motion Acceptance
 
 Basic motion is accepted as a rough free-motion mass and torque body. It is a
 structured checkpoint for early design iteration, not a controller, contact
 model, FEM model, MuJoCo model, or printable CAD validation.
-
-## Acceptance Scope
 
 Basic motion currently covers:
 
@@ -64,3 +92,4 @@ Both commands must pass:
 uv run python -m unittest ci/test_basic_motion_acceptance.py
 uv run python -m src.components.z_common.mass_model --out-dir /tmp/chihuahua_basic_motion_acceptance
 ```
+
