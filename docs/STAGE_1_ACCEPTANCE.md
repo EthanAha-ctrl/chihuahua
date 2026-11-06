@@ -8,7 +8,7 @@ model, FEM model, MuJoCo model, or printable CAD validation.
 
 Stage 1 currently covers:
 
-- Read `materials.yaml`, `actuators.yaml`, and `batteries.yaml`.
+- Read `vendor/components/material/lists.md`, `vendor/components/joint/lists.md`, and `vendor/components/battery/lists.md`.
 - Build a rough rigid body mass model from the current endpoint geometry.
 - Output total mass and center of mass.
 - Output free-space inertial torque estimates for waist, legs, neck, and
@@ -26,7 +26,7 @@ Stage 1 currently covers:
 Running:
 
 ```bash
-uv run python mass_model.py --out-dir /tmp/chihuahua_stage1_acceptance
+uv run python -m src.components.mass_model --out-dir /tmp/chihuahua_stage1_acceptance
 ```
 
 must produce:
@@ -62,5 +62,5 @@ Both commands must pass:
 
 ```bash
 uv run python -m unittest tests/test_stage1_acceptance.py
-uv run python mass_model.py --out-dir /tmp/chihuahua_stage1_acceptance
+uv run python -m src.components.mass_model --out-dir /tmp/chihuahua_stage1_acceptance
 ```

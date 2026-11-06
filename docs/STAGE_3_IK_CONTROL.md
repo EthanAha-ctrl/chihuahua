@@ -30,7 +30,7 @@ Stage 3 当前不覆盖：
 ## Entry Point
 
 ```bash
-uv run python stage3_ik_control.py \
+uv run python -m src.components.stage3_ik_control \
   --out-dir stage3_outputs/ik_control \
   --primitive stand \
   --frame-count 5
@@ -51,7 +51,7 @@ stage3_ik_control_summary.yaml
 `pygame_mass_viewer.py` now includes a Stage 3 command overlay:
 
 ```bash
-uv run python pygame_mass_viewer.py
+uv run python -m src.components.pygame_mass_viewer
 ```
 
 The overlay shows 21 joint command bars:
@@ -86,7 +86,7 @@ visualization: no gravity, no contact, no support reaction.
 Useful options:
 
 ```bash
-uv run python pygame_mass_viewer.py \
+uv run python -m src.components.pygame_mass_viewer \
   --stage3-target-radius-min-m 0.18 \
   --stage3-target-radius-max-m 0.34 \
   --stage3-target-period-s 1.4 \
@@ -136,7 +136,7 @@ current IK / torque / geometric support checks.
 
 Stage 3 reuses:
 
-- `dog_description.yaml` as the geometry and joint-range source.
+- `vendor/reference/urdf/chihuahua/lists.md` as the geometry and joint-range source.
 - `mass_model.py` for Stage 1 mass, COM and free-space torque rows.
 - The same leg and head chain conventions used by `pygame_mass_viewer.py`.
 

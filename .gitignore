@@ -127,3 +127,7 @@ stage2_outputs/
 stage3_outputs/
 stage4_outputs/
 MUJOCO_LOG.TXT
+
+# Temporary artifacts
+/artifacts/*
+!/artifacts/.gitkeep

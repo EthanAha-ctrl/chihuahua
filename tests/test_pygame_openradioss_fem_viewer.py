@@ -4,9 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-import pygame_openradioss_fem_viewer as viewer
-
-
+from src.components import pygame_openradioss_fem_viewer as viewer
 class PygameOpenRadiossFemViewerTest(unittest.TestCase):
     def test_loads_and_interpolates_torque_replay_overlay_csv(self):
         with tempfile.TemporaryDirectory() as tmp:

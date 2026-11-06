@@ -7,10 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-import mass_model
-import stage4_mujoco_contact as stage4
-
-
+from src.components import mass_model
+from src.components import stage4_mujoco_contact as stage4
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_OUTPUTS = {
     "mujoco_model.xml",
@@ -24,11 +22,11 @@ REQUIRED_OUTPUTS = {
 
 class Stage4MujocoContactTest(unittest.TestCase):
     def load_inputs(self):
-        description = mass_model.load_dog_description(REPO_ROOT / "dog_description.yaml")
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         return description, catalog
 
@@ -62,7 +60,7 @@ class Stage4MujocoContactTest(unittest.TestCase):
                     "uv",
                     "run",
                     "python",
-                    "stage4_mujoco_contact.py",
+                    "-m", "src.components.stage4_mujoco_contact",
                     "--out-dir",
                     str(out_dir),
                     "--frame-count",

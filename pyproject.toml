@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Lightweight endpoint geometry and pygame visualization for a yaw/pitch-waist quadruped."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "markdown-it-py>=4.0,<5",
     "matplotlib>=3.9",
     "mujoco>=3.9.0",
     "numpy>=2.0",

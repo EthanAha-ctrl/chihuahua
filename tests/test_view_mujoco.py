@@ -5,9 +5,7 @@ import mujoco
 import numpy as np
 import yaml
 
-import view_mujoco
-
-
+from src.components import view_mujoco
 class ViewMujocoLauncherTest(unittest.TestCase):
     FOOT_CONTACT_NAMES = {
         "front_left_foot_contact",

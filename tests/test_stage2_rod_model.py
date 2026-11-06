@@ -6,10 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-import mass_model
-import stage2_rod_model
-
-
+from src.components import mass_model
+from src.components import stage2_rod_model
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_OUTPUTS = {
     "nodes.csv",
@@ -22,11 +20,11 @@ REQUIRED_OUTPUTS = {
 
 class Stage2RodModelTest(unittest.TestCase):
     def make_model(self):
-        description = mass_model.load_dog_description(REPO_ROOT / "dog_description.yaml")
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         source = stage2_rod_model.build_stage1_model(description, catalog, "test_rods", 0.0, 0.0)
         return source, stage2_rod_model.build_whole_body_rod_model(source)
@@ -74,7 +72,7 @@ class Stage2RodModelTest(unittest.TestCase):
                     "uv",
                     "run",
                     "python",
-                    "stage2_rod_model.py",
+                    "-m", "src.components.stage2_rod_model",
                     "--out-dir",
                     str(out_dir),
                     "--frames",

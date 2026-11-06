@@ -57,11 +57,11 @@ Stage 4 first-light 不是完整行走仿真，也不是闭环 balance controlle
 Open the default Stage 4 stand model directly in MuJoCo's native GUI:
 
 ```bash
-./view_mujoco.py
+uv run python -m src.components.view_mujoco
 ```
 
 This launcher has no arguments. It refreshes the default Stage 4 MJCF in
-`stage4_outputs/mujoco_viewer/` and opens MuJoCo's viewer. The launcher exports
+`artifacts/mujoco/mujoco_viewer/` and opens MuJoCo's viewer. The launcher exports
 a gravity-on GUI inspection model with four real foot contact geoms on the
 ground plane. Visible structural capsules are also collision-enabled. It does
 not use invisible foot-anchor bodies or foot-pin equalities. The control panel
@@ -128,7 +128,7 @@ the Stage 2 native torque-replay case without an explicit load-case policy.
 
 Stage 4 reuses:
 
-- `dog_description.yaml` for geometry and joint limits.
+- `vendor/reference/urdf/chihuahua/lists.md` for geometry and joint limits.
 - `mass_model.py` for mass, COM and inertia.
 - `stage2_rod_model.py` for whole-body rod/capsule topology.
 - `stage3_ik_control.py` for trajectory frames and support-leg state.

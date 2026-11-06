@@ -4,9 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import mass_model
-
-
+from src.components import mass_model
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_OUTPUTS = {
     "mass_elements.csv",
@@ -42,7 +40,7 @@ class Stage1AcceptanceTest(unittest.TestCase):
         cls.tmpdir = tempfile.TemporaryDirectory()
         cls.out_dir = Path(cls.tmpdir.name)
         result = subprocess.run(
-            ["uv", "run", "python", "mass_model.py", "--out-dir", str(cls.out_dir)],
+            ["uv", "run", "python", "-m", "src.components.mass_model", "--out-dir", str(cls.out_dir)],
             cwd=REPO_ROOT,
             text=True,
             stdout=subprocess.PIPE,
@@ -120,11 +118,11 @@ class Stage1AcceptanceTest(unittest.TestCase):
             self.assertGreaterEqual(float(row["required_torque_nm"]), 0.0)
 
     def test_head_neck_anchor_and_torque_acceptance(self):
-        description = mass_model.load_dog_description(REPO_ROOT / "dog_description.yaml")
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         assumptions = mass_model.Stage1Assumptions()
         model = mass_model.build_mass_model(
@@ -148,7 +146,7 @@ class Stage1AcceptanceTest(unittest.TestCase):
         self.assertIn("head_claw", torque_joints)
 
     def test_payload_mount_frames_are_explicit_and_valid(self):
-        data = mass_model.yaml_mapping(REPO_ROOT / "batteries.yaml", "batteries")
+        data = mass_model.configuration_mapping(REPO_ROOT / "vendor/components/battery/lists.md", "batteries")
 
         for group_name in ("batteries", "electronics"):
             group = mass_model.required_mapping(data, group_name, "batteries")
@@ -158,9 +156,9 @@ class Stage1AcceptanceTest(unittest.TestCase):
                 self.assertIn(item["mount_frame"], VALID_MOUNT_FRAMES)
 
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         self.assertIn(catalog.battery.mount_frame, VALID_MOUNT_FRAMES)
         for item in catalog.electronics:

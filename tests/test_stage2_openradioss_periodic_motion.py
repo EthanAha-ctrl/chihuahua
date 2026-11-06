@@ -3,20 +3,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import mass_model
-import stage2_openradioss_periodic_motion as periodic_motion
-
-
+from src.components import mass_model
+from src.components import stage2_openradioss_periodic_motion as periodic_motion
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Stage2OpenRadiossPeriodicMotionTest(unittest.TestCase):
     def build_case(self, out_dir: Path, control_policy: str = "stage1-torque-replay"):
-        description = mass_model.load_dog_description(REPO_ROOT / "dog_description.yaml")
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         case = periodic_motion.build_periodic_motion_case(
             description,

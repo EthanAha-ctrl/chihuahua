@@ -221,7 +221,7 @@ After the CSV exists, generate a visual first-light artifact from this repo:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python tools/openradioss_tensile_gif.py \
+uv run python -m src.components.fem_tools.openradioss_tensile_gif \
   --run-dir "$OR_ROOT/runs/tensile_section1/1_LAW2"
 ```
 
@@ -273,7 +273,7 @@ The first Chihuahua-specific OpenRadioss deck generator is:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python stage2_openradioss_deck.py \
+uv run python -m src.components.stage2_openradioss_deck \
   --out-dir "$OR_ROOT/runs/chihuahua_stage2_whole_body_beam"
 ```
 
@@ -328,7 +328,7 @@ viewer pose is a torque/reference source, not a hard motion boundary.
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python stage2_openradioss_periodic_motion.py \
+uv run python -m src.components.stage2_openradioss_periodic_motion \
   --out-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam" \
   --samples 25 \
   --solver-duration-ms 8 \
@@ -363,7 +363,7 @@ Render the native beam-resultant strain GIF from T01:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python stage2_openradioss_periodic_motion.py \
+uv run python -m src.components.stage2_openradioss_periodic_motion \
   --out-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam" \
   --samples 25 \
   --solver-duration-ms 8 \
@@ -448,7 +448,7 @@ For interactive inspection, use the pygame viewer instead of a pre-rendered GIF:
 
 ```bash
 cd /mnt/s8t/chihuahua
-uv run python pygame_openradioss_fem_viewer.py \
+uv run python -m src.components.pygame_openradioss_fem_viewer \
   --run-dir "$OR_ROOT/runs/chihuahua_stage2_stage1_torque_replay_radius12_8mm_native_beam"
 ```
 

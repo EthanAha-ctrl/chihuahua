@@ -14,7 +14,7 @@ OpenRadioss 的本地 first-light 复现实验记录在 `docs/STAGE_2_OPENRADIOS
 `lumped_masses.csv`、`rod_model_summary.yaml` 和杆系 GIF。
 
 ```bash
-uv run python stage2_rod_model.py --out-dir stage2_outputs/rod_model
+uv run python -m src.components.stage2_rod_model --out-dir stage2_outputs/rod_model
 ```
 
 这个 rod model 仍然是整机模型：body、waist、hips、four legs、feet、neck
@@ -30,7 +30,7 @@ condition。
 OpenRadioss whole-body beam deck 由同一份 rod graph 生成：
 
 ```bash
-uv run python stage2_openradioss_deck.py \
+uv run python -m src.components.stage2_openradioss_deck \
   --out-dir stage2_outputs/openradioss_beam_deck
 ```
 
@@ -46,7 +46,7 @@ joint torque 写成 OpenRadioss `/CLOAD` equal-and-opposite nodal moment
 couple。
 
 ```bash
-uv run python stage2_openradioss_periodic_motion.py \
+uv run python -m src.components.stage2_openradioss_periodic_motion \
   --out-dir stage2_outputs/openradioss_periodic_motion \
   --solver-duration-ms 8 \
   --viewer-motion-seconds 0.005 \
@@ -106,7 +106,7 @@ outer-fiber strain 约 `2.20e-4`，最大 outer-fiber stress 约 `0.703 MPa`。
 
 ## 1. FEM 输入模型
 
-- 读取 `dog_description.yaml`
+- 读取 `vendor/reference/urdf/chihuahua/lists.md`
 - 读取 `pygame_mass_viewer.py` / Stage 1 linkage 同源生成的 whole-body rod graph
 - 读取材料、打印方向、rod radius / mesh / lumped-mass 参数
 - 读取 actuator、battery、electronics 的 mass / COM / inertia / placement

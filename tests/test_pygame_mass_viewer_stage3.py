@@ -4,20 +4,18 @@ from pathlib import Path
 
 import numpy as np
 
-import mass_model
-import pygame_mass_viewer as viewer_model
-
-
+from src.components import mass_model
+from src.components import pygame_mass_viewer as viewer_model
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class PygameMassViewerStage3Test(unittest.TestCase):
     def load_inputs(self):
-        description = mass_model.load_dog_description(REPO_ROOT / "dog_description.yaml")
+        description = mass_model.load_dog_description(REPO_ROOT / "vendor/reference/urdf/chihuahua/lists.md")
         catalog = mass_model.load_catalog(
-            REPO_ROOT / "materials.yaml",
-            REPO_ROOT / "actuators.yaml",
-            REPO_ROOT / "batteries.yaml",
+            REPO_ROOT / "vendor/components/material/lists.md",
+            REPO_ROOT / "vendor/components/joint/lists.md",
+            REPO_ROOT / "vendor/components/battery/lists.md",
         )
         return description, catalog
 

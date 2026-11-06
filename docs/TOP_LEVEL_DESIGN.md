@@ -78,10 +78,10 @@ life context -> embodied behavior -> social learning -> survival adaptation
 
 ## 模型对比 viewer
 
-`uv run python pygame_mass_viewer.py --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
+`uv run python -m src.components.pygame_mass_viewer --model go2`（也可选 `aibo`、`chihuahua`、`pupper`）。
 窗口内按 `1/2/3/4` 切换 Chihuahua / Go2 / Aibo ERS-7 / Pupper v3；Go2 和 Aibo 保留 URDF 拓扑，关节角度遵守 URDF 限位。
 `B` 全身转动，`M` 单关节，`N` 或 `[/]` 选关节，左右键或横拖关节行调角；`空格` 暂停，`0` 零姿态，`F` 居中，`V` 切换 mesh 包围盒。
-模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](models/README.md)。
+模型显示为骨架及包围盒；质量/COM 取自 URDF。`R` 切换自动目标触达，`G` 切换关节控制条；自动选择脚端（Aibo 还包括头部）。`Y` 显示共用材料／力矩面板；URDF 用相对密度缩放质量，力矩裕度使用 `effort` 上限。[模型来源](vendor/reference/urdf/README.md)。
 
 
 
@@ -120,7 +120,7 @@ COM changes torque and control
 当前仓库已经有 yaw/pitch-waist quadruped 的几何雏形：
 
 ```text
-dog_description.yaml
+vendor/reference/urdf/chihuahua/lists.md
 endpoint_geometry.py
 pygame_endpoint_viewer.py
 ```
@@ -615,9 +615,9 @@ next design decision
 建议新增文件结构：
 
 ```text
-materials.yaml
-actuators.yaml
-batteries.yaml
+vendor/components/material/lists.md
+vendor/components/joint/lists.md
+vendor/components/battery/lists.md
 fasteners.yaml
 design_state.py
 mass_model.py

@@ -10,10 +10,8 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 import pygame
-import pygame_mass_viewer as viewer
-import urdf_linkage as urdf
-
-
+from src.components import pygame_mass_viewer as viewer
+from src.components import urdf_linkage as urdf
 class UrdfLinkageTests(unittest.TestCase):
     def test_pupper_mirrored_meshes_mass_and_feet(self):
         model = urdf.load_urdf(urdf.MODEL_PATHS["pupper"])
