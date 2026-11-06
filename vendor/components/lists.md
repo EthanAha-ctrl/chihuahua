@@ -10,4 +10,4 @@
 | Tendon | Purchased tendon components | [tendon/](tendon/) | No vendor files yet |
 
 Current actuator candidates and supplier links: [README](../../README.md#actuator-vendor-list).
-Custom tendon CAD code: `src/components/tendon/`; design notes: [RI study](../../docs/ri_tendon_module.md).
+Custom tendon CAD code: `src/components/tendon/`; design notes: [RI study](ri_tendon_module.md).
