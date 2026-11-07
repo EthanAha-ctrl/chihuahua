@@ -1,3 +1,7 @@
+# Human motion annotation and IK
+
+使用 Scuf Omega Wireless PlayStation joystick 进行人工控制与动作标注，为固定设计下的 controller 训练提供数据。任务与奖励由 [3K tasks component](../e_task_reward_rl/README.md) 定义。
+
 # IK control: IK And Control First Light
 
 目标：把 Basic motion/2 形成的几何、质量和力矩模型接到控制侧，先建立一个

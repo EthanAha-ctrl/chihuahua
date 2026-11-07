@@ -18,9 +18,9 @@ Get parts ready:
 
 - a. Basic motion with given geometry;
 - b. Mujoco sim with gravity and landing plane;
-- c. FEM/FEA at a certain snapshot where the Mujoco gives max torque. The assumption is that when joint torque reaches maximum, the articulation takes the max force.
-- c. Human controlled motion annotation with Scuf Omega Wireless PlayStation joystick.
-- d. Task definition. Reward definition. RL framework.
+- c. FEM/FEA on snapshots selected from MuJoCo joint-side actuation torque and contact-surface resultant force peaks; whole-body, local load-path, or both. The assumption is that when joint torque reaches maximum, the articulation takes the max force.
+- d. Human controlled motion annotation with Scuf Omega Wireless PlayStation joystick.
+- e. Task definition. Reward definition. RL framework.
 
 ## Phase 2, the loop
 
@@ -30,28 +30,28 @@ With these parts, we construct the outer inner loop:
 
 ```mermaid
 flowchart TD
-    TASK["d. Task, Reward. RL."]
+    TASK["e. Task, Reward. RL."]
     LIST["Actuator List"]
 
     subgraph OUTER["Outer loop, actuator selection"]
-        A["Select actuator"]
+        A["AI coding agent selects actuator combinations<br/>Gradient-free search"]
 
         subgraph INNER["mid loop: Opt for geometry / material"]
             G["geometry / material design"]
-            SIM["b. 构建 MuJoCo 模型<br/>重力 + 地面 + 执行器参数"]
+            SIM["b. 构建 MuJoCo 模型<br/>重力 + 地面 + 执行器参数 + 凹轮传动"]
 
             subgraph RL["最内层循环: 固定设计, 优化 controller"]
-                HUMAN["c. Scuf Omega<br/>人工控制与动作标注"]
-                TRAIN["d. RL 训练 controller"]
+                HUMAN["d. Scuf Omega<br/>人工控制与动作标注"]
+                TRAIN["e. RL 训练 controller"]
                 RUN["b. MuJoCo 执行任务"]
-                REWARD["d. 计算 Reward"]
+                REWARD["e. 计算 Reward"]
                 TRAIN --> RUN --> REWARD --> TRAIN
                 HUMAN --> TRAIN
             end
 
             EVAL["评估 controller<br/>记录任务表现与载荷轨迹"]
-            SNAP["提取最大关节扭矩时刻的 snapshot"]
-            FEM["c. 对 snapshot 做 FEM / FEA"]
+            SNAP["episode 全局绝对力矩峰值 + 接触面合力峰值<br/>相同时刻去重"]
+            FEM["c. FEM / FEA<br/>整机 / 局部整条传力路径 / 两者"]
             UPDATE["根据任务表现与结构结果<br/>更新 geometry / material"]
 
             G --> SIM --> TRAIN
@@ -132,36 +132,26 @@ k_j^*=\arg\max_k p_{j,k}
 
 得到实际采购型号. 降温不保证自动成为 one-hot; 最终离散化后, 需要重新优化结构, 训练控制器并验证, 因为优化过程中使用的混合执行器可能没有对应实物. 用连续权重搜索执行器组合, 让经过结构优化和控制训练后的任务表现决定选型.
 
----
+### 2.3 Actuator selection
 
+外层由 AI coding agent 决定候选 actuator 的组合与选择，采用无梯度搜索。
+候选数据见 [joint list](vendor/components/joint/lists.md)。当前不要求连续松弛或梯度穿过内部优化。
+中层负责 geometry / material，最内层在固定设计下训练 controller；这项外层决定不额外规定中层或 RL 的算法。
+a. 给定 geometry 的基本运动是独立组件，不属于任何优化循环。
 
+### 2.4 MuJoCo snapshots and FEA
 
+AI coding agent 负责把凹轮传动关系正确建进 MuJoCo 模型。选 snapshot 只用 MuJoCo 输出，不增加 FEA 前的失效风险预测或外部载荷估算。
 
----
+每个 episode：
 
-mechanical tendon stop + 凹轮
+1. 在所有被驱动的转动关节、所有采样时刻中，取关节侧驱动力矩绝对值最大的一个时刻。使用 `qfrc_actuator` 的对应转动自由度；它表示模型传动后的执行器贡献，不等于完整关节反力。
+2. 将同一接触面的各接触点力转换到同一坐标系后向量求和，按合力大小取峰值时刻。多个接触面之间取整个 episode 的最大值。
+3. 两个时刻相同只保留一个 snapshot，否则保留两个。
+4. 用户选择整机 FEA、局部 FEA 或两者。局部分析覆盖峰值对应的整条传力路径。
 
-
----
-
-
-| 尚未覆盖的内容          | `docs` 中的具体含义                                                                                                                          | 在新架构中的位置                                                  | Pere comment              |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------- |
-| **任务集本身如何修正**    | 野外结果 → 证据 → 更新设计目标; 每条目标要能追溯来源, 或标记为假设. [来源](docs/SURVIVAL_TO_DESIGN_GOALS.md)                            | README 固定了任务集, 还没有覆盖如何验证这些任务确实代表 wild survival.             | 3K tasks 定义 wild survival |
-| **行为风格目标**       | ADM 动作先验, 动物动作数据 retargeting, 行为 embedding, 以及与 Chihuahua 行为分布的距离. [来源](docs/adm_geometry_optimization.md) | 当前 Task / Reward 没有明确包含"行为像 Chihuahua". 这是额外目标, 是否保留需要单独决定.  | ADM 是什么?                  |
-| **完整质量与供电模型**    | 电池, 驱动器, 线束, 电子设备, 紧固件, 轴承的质量, 空间和安装位置; 更新 COM/惯量. [来源 (line 195)](docs/TOP_LEVEL_DESIGN.md#L195)               | 应进入 geometry/actuator 的物理模型, 否则优化遗漏整机成本.                    | merge docs 中的content      |
-| **材料与制造约束**      | FDM 各向异性, 层间强度, 疲劳, 打印方向, 最小壁厚, 装配公差, 以及试样校准. [来源 (line 143)](docs/TOP_LEVEL_DESIGN.md#L143)                   | README 的 `material` 尚未展开这些变量和约束.                           | merge docs 中的content      |
-| **传动与关节架构**      | 串/并联弹性, 机械限位, 离合/制动, 回驱, 冲击承受能力, 可变刚度; 近端驱动与远端轻量化. [来源](docs/yellowstone.md)                                  | 当前 actuator 连续松弛主要描述选型; 这些机构参数是否一起优化尚未定义.                   | good point.               |
-| **形态搜索范围**       | 可控刚度脊柱, 肩带活动, 骨盆与脊柱的载荷传递. [来源](docs/spine.md)                                                             | `geometry` 到底只优化固定拓扑的尺寸, 还是允许关节拓扑/自由度变化, 目前没有说明.             | `脊柱, 肩带活动, 骨盆与脊柱` 都无法实现, 太重 |
-| **复杂地形与拒绝/恢复行为** | 不平地面, 坡度, 台阶, 摩擦, 落脚点选择, 以及危险地形拒绝进入与恢复. [来源](docs/STAGE_5_COMPLEX_TERRAIN_IK.md)                             | 可以归入任务集, 环境分布和评估条件; PoC 当前只有地面.                              | defined in 3K tasks       |
-| **每轮可追溯记录**      | 设计版本, 物理假设, 质量/惯量, 载荷, FEM 结果, 控制限制和下一步设计决定. [来源 (line 581)](docs/TOP_LEVEL_DESIGN.md#L581)                   | 三层优化需要统一的实验记录, 才能重现和比较结果.                                   | not a big deal            |
-
-旧文档有几处需要和新方向明确划界:
-
-- **FEM 范围与载荷来源**: 旧文档要求整机 FEM, 原生工况来自 Stage 1 自由空间 torque replay, 排除重力/接触. 新版采用 MuJoCo snapshot, 需要重新定义载荷传递, 边界条件, 以及是否继续坚持整机分析. [旧定义](docs/STAGE_2_WHOLE_ROBOT_FEM.md)
-- **已有反馈接口的能力边界**: Stage 4 文档记录真实 MuJoCo 接触力, 但写给 Stage 2 的反馈仍来自准静态支撑力 proxy, 且没有自动施加到 FEM. 新 README 的这条链仍是待实现目标. [接口说明 (line 111)](docs/STAGE_4_MUJOCO_CONTACT.md#L111)
-- **旧阶段顺序与优化方法**: 旧路线按 FEM → IK → MuJoCo 分阶段推进; ADM 文档建议无梯度几何优化. 它们需要标记为历史路线, 避免与新的可微三层循环并列成为实施要求.
-- **旧 fallback 策略**: FEM 文档允许缺失 beam resultants 时退回位移推算应变. 这与你现在要求的 fail loud 不一致, 重构时需要明确处理. [记录 (line 423)](docs/STAGE_2_OPENRADIOSS_FIRST_LIGHT.md#L423)
+这些峰值用于快速筛选工况，不宣称已经找到最大应力或最容易损坏的部件；由随后 FEA 检验。
+接触面的模型分组、传力路径提取、载荷映射及边界条件需要在实现中明确表达，不能靠静默默认值补齐。
 
 ## Scope
 
@@ -552,7 +542,7 @@ whole-robot FEM stress / deformation hot spot
 
 早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
 
-IK control first-light 记录在 `docs/STAGE_3_IK_CONTROL.md`。当前实现先建立
+IK control first-light 记录在 [IK 文档](src/components/d_motion_annotation_and_ik/README.md)。当前实现先建立
 IK、trajectory primitive、torque margin checker 和几何级 support polygon
 awareness；MuJoCo/contact 仍属于 MuJoCo。
 
@@ -594,7 +584,7 @@ simulation-ready actuator commands
 
 把经过阶段 1-3 迭代的 CAD / rigid body / control 放进 MuJoCo。
 
-MuJoCo first-light 记录在 `docs/STAGE_4_MUJOCO_CONTACT.md`。当前实现先建立
+MuJoCo first-light 记录在 [MuJoCo 文档](src/components/b_mujoco_sim/README.md)。当前实现先建立
 MuJoCo XML export、foot contact geometry、准静态支撑反力 proxy 和
 FEM feedback load-case table；闭环 balance 和真实动态步态仍是后续工作。
 
