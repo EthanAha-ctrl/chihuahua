@@ -24,8 +24,6 @@
 - 优化过程中通过penalty逐步逼着每根杆子"表态"——最终收敛到某个确定的one-hot状态
 - 最后hard snap一下，所有杆子锁定到离散状态，再单独fine-tune控制网络
 
----
-
 ### 几个聪明的工程细节
 
 **1. Stability Pass**
@@ -41,8 +39,6 @@
 **3. 控制网络非常小**
 
 就一个hidden layer，32个neuron。作者是故意keep it small的——co-design的optimization landscape已经够nonconvex了，controller太复杂会让优化更难收敛。CPG（Central Pattern Generator）提供基础节奏信号，MLP只是在上面做modulation。
-
----
 
 ### 实验结果说了什么
 
@@ -76,35 +72,15 @@
 - 更小的design space（5×5而不是6×6）：自动rediscover了腿的division策略
 - 滑地面（有摩擦系数）：把payload贴地当锚，front leg折叠当刹车垫
 
----
-
-### 我的看法
-
-这篇paper的核心贡献不在某一个单独的技术点，而在于**把三件事拼在一起并且让它们work**：
-
+把三件事拼在一起并且让它们work：
 1. 把discrete design variable relaxation成连续的，再逐步binarize
 2. 在differentiable simulator里把structure-material-control耦合起来
 3. 用Augmented Lagrangian + stability pass来navigate极度nonconvex的landscape
 
 最valuable的其实是**ablation study的insight**：material distribution > topology > control这个hierarchy，以及三者的synergy effect大于各自之和。这个结论对robot design community有实际的指导意义——你在control上花再多功夫，如果physical design不对，天花板就在那。
 
-Limitations也很明显：2D、simplified physics、对initialization敏感、只有3种material state。但这些不影响它作为一个proof-of-concept的价值。
+Limitations：2D、simplified physics、对initialization敏感、只有3种material state。但这些不影响它作为一个proof-of-concept的价值。
 
-**相关链接**：
-- Taichi (他们用的differentiable simulation平台): https://github.com/taichi-dev/taichi
-- DiffTaichi原始paper: https://arxiv.org/abs/1910.00935
-- SoftZoo (类似的co-design但针对soft robot): https://arxiv.org/abs/2303.09555
-- Kriegman的evolutionary co-design: https://arxiv.org/abs/2502.10862
-
----
-
-我来阅读这篇paper的更多内容，以便给你做详细的技术讲解。
-
-
-
-
-
-好的，我已经通读了全文。下面来详细讲解这篇paper。
 
 ---
 

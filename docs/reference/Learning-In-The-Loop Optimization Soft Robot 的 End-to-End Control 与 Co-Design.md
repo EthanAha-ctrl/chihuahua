@@ -1,45 +1,16 @@
-好，用大白话说一遍。
-
----
-
-## 这篇 paper 在干嘛？
-
-**目标**：让一个软体机器人（soft robot）自己学会走路、伸手、干活。
-
-**难点**：软体机器人不像 rigid robot 那样有几个 joint 就能描述清楚状态。它是"一坨软的东西"，身上每一处都能弯、能扭、能变形。用 FEM 去模拟，一个 robot 就有上万甚至上百万个自由度，controller 根本搞不动。
-
-**以前的人怎么做的？** 两种思路：
-
+让一个软体机器人（soft robot）自己学会走路、伸手、干活。软体机器人不像 rigid robot 那样有几个 joint 就能描述清楚状态。它是"一坨软的东西"，身上每一处都能弯、能扭、能变形。用 FEM 去模拟，一个 robot 就有上万甚至上百万个自由度，controller 根本搞不动。以前两种思路：
 1. **手搓一个 representation**：比如用振动模态（modal basis）降维，或者人工在 robot 身上标几个点，取这几个点的位置和速度当 state。问题是你得提前知道 robot 怎么动，而且这种 representation 不考虑 task，也不考虑 actuator 放在哪。
-
 2. **进化算法**：把 controller 和 robot 的 material 参数丢进去，让遗传算法瞎试。能 work，但一个 robot 要跑 30000 次仿真，太慢。
 
-**这篇 paper 的思路**：别手搓了，让 robot 自己学一个 representation，但学的时候要看 task。
+别手搓了，让 robot 自己学一个 representation，但学的时候要看 task。让 robot 先乱动 → 把乱动的轨迹数据存下来 → 用 VAE 学一个低维 representation → 拿这个 representation 去 optimize controller → controller 让 robot 动得更好 → 新的轨迹数据回来更新 VAE → 循环往复。Learning 和 Optimization 交替进行，互相喂饭。
 
----
-
-## 核心方法用一句话说
-
-**让 robot 先乱动 → 把乱动的轨迹数据存下来 → 用 VAE 学一个低维 representation → 拿这个 representation 去 optimize controller → controller 让 robot 动得更好 → 新的轨迹数据回来更新 VAE → 循环往复。**
-
-就这么简单。Learning 和 Optimization 交替进行，互相喂饭。
-
----
-
-## 具体拆开讲
-
-### 1. 物理模拟：用 MPM（Material Point Method）
-
-Robot 被表示成一堆小粒子撒在一个 grid 上。每个粒子有质量、速度、形变信息。每一步物理模拟就是：
+物理模拟：用 MPM（Material Point Method）. Robot 被表示成一堆小粒子撒在一个 grid 上。每个粒子有质量、速度、形变信息。每一步物理模拟就是：
 - 粒子把信息写到 grid 上
 - 在 grid 上算受力、更新速度
 - 更新后的信息回到粒子
+grid 上有一个规整的 velocity field，天然适合卷积神经网络吃。FEM 的 mesh 没这个好处。
 
-**关键好处**：grid 上有一个规整的 velocity field，天然适合卷积神经网络吃。FEM 的 mesh 没这个好处。
-
-### 2. 观察者（Observer）：一个 VAE
-
-输入是 grid 上的 velocity field（一张图，每个像素存 x/y 速度），过一个 conv encoder 压成一个低维向量（比如 10 维），再过 deconv decoder 还原回去。
+观察者（Observer）：一个 VAE. 输入是 grid 上的 velocity field（一张图，每个像素存 x/y 速度），过一个 conv encoder 压成一个低维向量（比如 10 维），再过 deconv decoder 还原回去。
 
 训练目标就是 reconstruction loss + KL 正则。
 
@@ -53,17 +24,10 @@ Robot 被表示成一堆小粒子撒在一个 grid 上。每个粒子有质量�
 
 Observer + Controller + Simulator 全部可微。所以可以直接 backprop through 整个 simulation trajectory，算出 loss 对 controller 参数和 material 参数的梯度，用 Adam 更新。
 
----
-
-## 为什么是交替的，而不是同时优化？
-
-两个原因：
-
+为什么是交替的，而不是同时优化？
 1. **VAE 比 controller 难收敛**：如果同时优化，controller 会在一个还没学好的烂 representation 上先找到 local minimum，之后 representation 变好了也回不来了。
 
 2. **算力不对等**：更新 VAE 只需要 backprop through autoencoder（快），而更新 controller 需要 backprop through 整个 simulation（慢）。交替做可以先把 simulation 跑完存一批数据，再拿数据慢慢训 VAE。
-
----
 
 ## 三个稳定性 trick
 
@@ -74,8 +38,6 @@ Observer + Controller + Simulator 全部可微。所以可以直接 backprop thr
 | VAE overfit 最近数据 | Replay buffer，存多个 episode 的数据 | DQN |
 | VAE overfit 历史数据 | Validation set early stopping | 标准 ML |
 | VAE 突变导致 controller 崩 | Target network smoothing，慢慢更新参数 | DDPG |
-
----
 
 ## 实验结论
 
@@ -88,16 +50,12 @@ Observer + Controller + Simulator 全部可微。所以可以直接 backprop thr
 
 **为什么 k-means 更差？** 因为 k-means 按几何位置聚类，不看 dynamics。两个手臂几何上近、动力学上也类似，k-means 会把它们混到一起。但任务上它们可能需要独立控制。VAE 看的是 velocity field，能自然地把功能相似的部分映射到相似的 latent coordinate。
 
----
-
-## 一句话总结
-
 这篇 paper 的本质：soft robot 的 representation、control、material design 三个东西互相依赖，没法单独优化。这篇 paper 的贡献是让它们在一个 loop 里交替推进——先有个凑合的 representation 拿来 optimize control，control 产生更好的数据用来更新 representation，如此往复。VAE 学到的 representation 天然是 task-aware 和 dynamics-aware 的，比人工标注的 k-means cluster 或振动模态都更贴合任务需求。
 
 
 ---
 
-让我先读取完整论文内容。
+
 
 
 # Learning-In-The-Loop Optimization: Soft Robot 的 End-to-End Control 与 Co-Design

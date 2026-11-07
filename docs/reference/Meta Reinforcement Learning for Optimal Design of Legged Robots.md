@@ -1,45 +1,10 @@
-你想给四足机器人设计腿长，但每改一次设计就得重新训一个 controller 去评估"这腿好不好用"——太贵了。这篇 paper 先花一次钱训一个"什么腿都能快速上手"的 meta-policy，之后随便你抛什么设计过来，它5步微调就能给出接近满分的发挥，于是 design optimization 变得飞快。
-
----
-
-## 为什么这事难？
-
-设计机器人的腿，本质上是两个纠缠在一起的问题：
-
-1. **腿造多长？**（design problem）
-2. **这条腿怎么走？**（control problem）
-
-你不能只解决第一个不管第二个，因为"腿好不好"取决于"你能把它走成什么样"。一条腿配一个差的 controller 可能看起来很差，但其实是个好腿——你只是没走对。
-
-所以你得**同时**搞定 design 和 control，这就是 bilevel optimization——外层搜 design，内层对每个 design 找最优 control。
-
-内层是瓶颈。以前的做法是用 model-based control（trajectory optimization），但问题在于：
-
+你想给四足机器人设计腿长，但每改一次设计就得重新训一个 controller 去评估"这腿好不好用"——太贵了。这篇 paper 先花一次钱训一个"什么腿都能快速上手"的 meta-policy，之后随便你抛什么设计过来，它5步微调就能给出接近满分的发挥，于是 design optimization 变得飞快。设计机器人的腿，本质上是两个纠缠在一起的问题：1. **腿造多长？**（design problem）2. **这条腿怎么走？**（control problem）. 你不能只解决第一个不管第二个，因为"腿好不好"取决于"你能把它走成什么样"。一条腿配一个差的 controller 可能看起来很差，但其实是个好腿——你只是没走对。所以你得**同时**搞定 design 和 control，这就是 bilevel optimization——外层搜 design，内层对每个 design 找最优 control。内层是瓶颈。以前的做法是用 model-based control（trajectory optimization），但问题在于：
 - trajectory optimization 需要你**预先定义 gait pattern 和 motion trajectory**
 - 它基于简化模型（比如 centroidal dynamics，忽略腿的质量），和真实动力学有 gap
 - 它会**拒绝**那些 motion template 容纳不了的设计（比如太长或太短的腿）
 
-结果就是：你优化出来的 design 是被你预设的 motion 限定的，不是真正的最优。Garbage in, garbage out。
-
----
-
-## 用 RL 当内层会怎样？
-
-RL 不需要你预定义任何 motion。它在 simulator 里自己摸索，什么东西都能学，复杂地形、复杂 actuator 动力学，都不在话下。
-
-但有个坑：**naive multi-task RL 不行**。
-
-如果你把不同 design 参数当 random task 来训一个通用 policy，你会得到一个"什么腿都能走、但哪条腿都走不到最好"的策略。它是一个万金油，不是专家。
-
-问题在于 design optimization 需要对**每个** design 给出**它自己的最佳表现**。如果 controller 只能给出"一般般"的评估，你就分不清"0.61 倍腿长"和"1.02 倍腿长"哪个更好——因为 controller 对两者都只是凑合。
-
----
-
-## Meta-RL 怎么解决的
-
-MAML 的核心直觉特别简单：
-
-> 与其找一个"对所有 task 都还行"的参数，不如找一个**位置**——从这个位置出发，随便遇到什么 task，走几步 gradient descent 就能到那 task 的最优附近。
+结果就是：你优化出来的 design 是被你预设的 motion 限定的，不是真正的最优。Garbage in, garbage out。用 RL 当内层会怎样？RL 不需要你预定义任何 motion。它在 simulator 里自己摸索，什么东西都能学，复杂地形、复杂 actuator 动力学，都不在话下。但有个坑：**naive multi-task RL 不行**。如果你把不同 design 参数当 random task 来训一个通用 policy，你会得到一个"什么腿都能走、但哪条腿都走不到最好"的策略。它是一个万金油，不是专家。问题在于 design optimization 需要对**每个** design 给出**它自己的最佳表现**。如果 controller 只能给出"一般般"的评估，你就分不清"0.61 倍腿长"和"1.02 倍腿长"哪个更好——因为 controller 对两者都只是凑合。
+Meta-RL 的核心直觉特别简单：与其找一个"对所有 task 都还行"的参数，不如找一个位置 , 从这个位置出发，随便遇到什么 task，走几步 gradient descent 就能到那 task 的最优附近。
 
 打个比方：naive multi-task training 像是在找一个山谷最低的湖，水位不高不低，哪儿都差不多深。MAML 不是在找最低点，它是在找**山口**——站在那儿往任何一个谷底方向走两步就到了。
 
