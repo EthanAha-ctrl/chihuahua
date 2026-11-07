@@ -246,3 +246,47 @@ pack predator + denning mammal + cursorial runner + digging-capable animal
 6. **5-8 群族 + 育幼需要姿态表达和近身接触**  
    社交动物需要身体姿态、压低、翻滚、蜷护、幼仔贴近。躯干太刚会损失很多行为带宽。
 
+
+---
+
+- Core tasks: ~10.
+
+```text
+stay alive
+stay with pack / family
+seek food
+avoid danger
+learn household rules
+respond to social reward
+adapt to humans
+form attachment
+recover after injury
+keep behaving like itself
+```
+
+and
+
+```text
+生态 use case
+-> 生物行为需求
+-> 形态/脊柱/关节 architecture
+-> mass / torque / material / FEM / IK / MuJoCo
+-> 复杂地形 refusal / survival validation
+```
+and
+
+```text
+agency
+social intrinsic behavior
+learning loop
+wild survival
+human-life adaptation
+embodied continuity
+```
+
+
+intelligence 是生态和社会性的。
+`good boy / good girl` 是关系里的 reinforcement。
+它会观察人怎么生活，学什么时候靠近、什么时候让开、谁需要陪伴、哪里安全、哪里不能碰。
+
+life context -> embodied behavior -> social learning -> survival adaptation

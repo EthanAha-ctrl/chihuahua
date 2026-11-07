@@ -1,5 +1,7 @@
 # chihuahua
 
+https://chiwuawua.com/
+
 This repo is trying to build a loop, inner loop, outer loop, co-optimize geometry, material, actuator, controller for a single set of goals: small set of action tasks (3K tasks).
 
 The loop will be:
@@ -10,7 +12,7 @@ The loop will be:
 
 With that we'll be able to get an quadrupedal robot that is highly optimized for `wild survival` which is defined by the 3K tasks.
 
-To make it happen, the project comes in multiple phases.
+To make it happen, the project comes in two phases.
 
 ## Phase 1, proof of concept
 
@@ -78,7 +80,7 @@ flowchart TD
 
 ### 2.2 Differentiable
 
-Build parametric model of actuator set.
+Build parametric model of the actuator set.
 
 希望任务表现的梯度, 能一路传回 actuator 参数, 并且包含 geometry/material 重新优化, controller 重新训练后的影响.
 
@@ -92,26 +94,11 @@ F(a) &= L_{\mathrm{task}}\big(a,x^*(a),\theta^*(a,x^*(a))\big)
 \end{aligned}
 ```
 
-中层还要满足 FEM 强度等约束. 外层需要的是 $`dF/da`$: 改变执行器后, 让结构和控制器适应它, 最终任务表现会怎样变化. 外层直接优化 component list 的选择权重, 用连续松弛让执行器选型参与求导. 假设每个关节 $`j`$ 有 $`K`$ 个候选执行器, 为它们设置可训练参数 $`\alpha_{j,k}`$:
+中层要满足 FEM 强度等约束. 外层需要的是 $`dF/da`$: 改变执行器后, 让结构和控制器适应它, 最终任务表现会怎样变化. 外层直接优化 component list 的选择权重, 用连续松弛让执行器选型参与求导. 假设每个关节 $`j`$ 有 $`K`$ 个候选执行器, 为它们设置可训练参数 $`\alpha_{j,k}`$:
 
-```math
-p_{j,k} = \frac{\exp(\alpha_{j,k}/\tau)}{\sum_{\ell=1}^{K}\exp(\alpha_{j,\ell}/\tau)}
-```
-
-$`p_{j,k}`$ 是选择权重, $`\tau`$ 控制选择有多集中. 你的 actuator parametric model 用这些权重生成松弛后的执行器模型, 例如:
-
-```math
-m_j=\sum_k p_{j,k}m_k,\qquad T_j(\omega)=\sum_k p_{j,k}T_k(\omega)
-```
-
-质量, 尺寸, 惯量, 扭矩-转速曲线等都必须使用**同一组选择权重**, 避免分别挑选各型号最有利的属性.
-
-三层循环于是变成:
 
 ```text
 外层更新 actuator 选择参数 α
-    ↓ softmax
-各关节的候选权重 p
     ↓ actuator parametric model
 松弛后的执行器物理模型
     ↓
@@ -124,39 +111,18 @@ m_j=\sum_k p_{j,k}m_k,\qquad T_j(\omega)=\sum_k p_{j,k}T_k(\omega)
 梯度穿过内部优化, 更新 α
 ```
 
-连续松弛解决了"候选选择"这个离散节点. MuJoCo, FEM, 快照选择以及内部训练更新的求导路径, 仍需要接通, 才能得到你要的外层梯度. 最后逐渐降低温度, 让权重集中, 再取:
+连续松弛希望可以解决"候选选择"这个离散节点, 但设计上讲, 也会keep eye open to AI coding driven iteration: 由AI harness review 中层优化的结果, 判定外层searching candidates. MuJoCo, FEM, snapshot选择以及内部训练更新的求导路径, 仍需要接通, 才能得到外层梯度. 取:
 
 ```math
 k_j^*=\arg\max_k p_{j,k}
 ```
 
-得到实际采购型号. 降温不保证自动成为 one-hot; 最终离散化后, 需要重新优化结构, 训练控制器并验证, 因为优化过程中使用的混合执行器可能没有对应实物. 用连续权重搜索执行器组合, 让经过结构优化和控制训练后的任务表现决定选型.
+得到实际采购型号. 最终离散化后, 需要重新优化结构, 训练控制器并验证, 优化过程中使用的混合执行器可能没有对应实物. 用连续权重搜索执行器组合, 让经过结构优化和控制训练后的任务表现决定选型.
 
-### 2.3 Actuator selection
 
-外层由 AI coding agent 决定候选 actuator 的组合与选择，采用无梯度搜索。
-候选数据见 [joint list](vendor/components/joint/lists.md)。当前不要求连续松弛或梯度穿过内部优化。
-中层负责 geometry / material，最内层在固定设计下训练 controller；这项外层决定不额外规定中层或 RL 的算法。
-a. 给定 geometry 的基本运动是独立组件，不属于任何优化循环。
 
-### 2.4 MuJoCo snapshots and FEA
+---
 
-AI coding agent 负责把凹轮传动关系正确建进 MuJoCo 模型。选 snapshot 只用 MuJoCo 输出，不增加 FEA 前的失效风险预测或外部载荷估算。
-
-每个 episode：
-
-1. 在所有被驱动的转动关节、所有采样时刻中，取关节侧驱动力矩绝对值最大的一个时刻。使用 `qfrc_actuator` 的对应转动自由度；它表示模型传动后的执行器贡献，不等于完整关节反力。
-2. 将同一接触面的各接触点力转换到同一坐标系后向量求和，按合力大小取峰值时刻。多个接触面之间取整个 episode 的最大值。
-3. 两个时刻相同只保留一个 snapshot，否则保留两个。
-4. 用户选择整机 FEA、局部 FEA 或两者。局部分析覆盖峰值对应的整条传力路径。
-
-这些峰值用于快速筛选工况，不宣称已经找到最大应力或最容易损坏的部件；由随后 FEA 检验。
-接触面的模型分组、传力路径提取、载荷映射及边界条件需要在实现中明确表达，不能靠静默默认值补齐。
-
-## Scope
-
-- Core tasks: ~10.
-- Outer loop: discrete search, no gradient.
 
 ## Related work
 
@@ -170,82 +136,9 @@ AI coding agent 负责把凹轮传动关系正确建进 MuJoCo 模型。选 snap
 
 ---
 
-# Top-Level Design
-
-
-
-Boston Dynamics 有非常深的 robot locomotion know-how:
-
-硬件集成、控制、动态平衡、执行器、可靠性、实机调参、跌倒恢复、量产工程，世界顶级。强在：
-
-```text
-robot performs tasks
-robot remains stable
-robot survives commercial use
-robot carries payload
-robot navigates human terrain
-```
-
-传统 robotics 的“task”通常是外部指定的：
-
-```text
-go there
-inspect this
-carry that
-open door
-avoid obstacle
-return to dock
-```
-
-环境是被工程师定义的，奖励函数是被工程师写的，失败模式是被测试场景枚举的。
-
 ---
 
-https://chiwuawua.com/
 
-`SURVIVAL_TO_DESIGN_GOALS.md` 很关键, 它把工程拉到“恢复一个智能动物继续生活的能力”。
- **return-to-wild / return-to-hunt prosthetic animal architecture** 是 know-how。
-它是一个 living agent, 目标是:
-
-```text
-stay alive
-stay with pack / family
-seek food
-avoid danger
-learn household rules
-respond to social reward
-adapt to humans
-form attachment
-recover after injury
-keep behaving like itself
-```
-
-and
-
-```text
-生态 use case
--> 生物行为需求
--> 形态/脊柱/关节 architecture
--> mass / torque / material / FEM / IK / MuJoCo
--> 复杂地形 refusal / survival validation
-```
-and
-
-```text
-agency
-social intrinsic behavior
-learning loop
-wild survival
-human-life adaptation
-embodied continuity
-```
-
-
-intelligence 是生态和社会性的。
-`good boy / good girl` 是关系里的 reinforcement。
-它会观察人怎么生活，学什么时候靠近、什么时候让开、谁需要陪伴、哪里安全、哪里不能碰。
-
-life context -> embodied behavior -> social learning -> survival adaptation
 
 
 ## 模型对比 viewer

@@ -93,3 +93,8 @@ uv run python -m unittest ci/test_basic_motion_acceptance.py
 uv run python -m src.components.z_common.mass_model --out-dir /tmp/chihuahua_basic_motion_acceptance
 ```
 
+Actuator selection
+
+候选数据见 [joint list](vendor/components/joint/lists.md)。当前不要求连续松弛或梯度穿过内部优化。
+中层负责 geometry / material，最内层在固定设计下训练 controller；这项外层决定不额外规定中层或 RL 的算法。
+a. 给定 geometry 的基本运动是独立组件，不属于任何优化循环。
