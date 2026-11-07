@@ -1,0 +1,210 @@
+{
+  "main": {
+    "id": "42c6720726a707f7",
+    "type": "split",
+    "children": [
+      {
+        "id": "c8a043b34ebaac1e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "28b764912e7f7f83",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "75fedf3c041aa47e",
+    "type": "split",
+    "children": [
+      {
+        "id": "c60fb445b07720c2",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "21a7e46cf9ea4af3",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "531d34fce9b0883b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "06913a56c69fad85",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "563671c3c543a7e8",
+    "type": "split",
+    "children": [
+      {
+        "id": "f2adef2ec2e745cc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "562f0a76ffc46e85",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "02936a92a5c256a0",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "ec166d251b0fa81e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "3089a27f15d07d48",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "13f576c259a8956f",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "28b764912e7f7f83",
+  "lastOpenFiles": [
+    "COSMIC Concurrent Optimization of Structure, Material, and Integrated Control for Robotic Systems.md",
+    "Computational Co-Optimization of Design Parameters and Motion Trajectories for Robotic Systems.md",
+    "A Versatile Co-Design Approach For Dynamic Legged Robots.md",
+    "Learning-In-The-Loop Optimization Soft Robot 的 End-to-End Control 与 Co-Design.md",
+    "Evolution Gym A Large-Scale Benchmark for Evolving Soft Robots.md",
+    "Deep Evolutionary Reinforcement Learning (DERL).md",
+    "Evolving Virtual Creatures.md",
+    "Learning Purposeful Co-designs of Bio-inspired Quadrupedal Robots.md",
+    "Learning-based Design and Control for Quadrupedal Robots with Parallel-Elastic Actuators.md",
+    "Meta Reinforcement Learning for Optimal Design of Legged Robots.md",
+    "Reinforcement Learning for Improving Agent Design.md",
+    "A Versatile Co-Design Approach For Dynamic Legged Robots.txt",
+    "Jointly Learning to Construct and Control Agents using Deep Reinforcement Learning.md",
+    "New Text Document - Copy (10).txt",
+    "New Text Document - Copy (9).txt",
+    "New Text Document - Copy (8).txt",
+    "New Text Document - Copy (7).txt",
+    "New Text Document - Copy (6).txt",
+    "New Text Document - Copy (5).txt",
+    "New Text Document - Copy (4).txt",
+    "New Text Document - Copy (3).txt",
+    "New Text Document - Copy (2).txt",
+    "New Bitmap image.bmp"
+  ]
+}
