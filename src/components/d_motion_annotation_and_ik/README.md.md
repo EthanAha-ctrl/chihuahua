@@ -171,6 +171,53 @@ uv run python -m unittest discover -s ci
 
 ---
 
+
+## IK control: IK And Control Development
+
+当 mass、torque 和整机结构经过几轮 FEM 后，开始加入 IK 和控制。
+
+早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
+
+IK control first-light 记录在 [IK 文档](src/components/d_motion_annotation_and_ik/README.md)。当前实现先建立
+IK、trajectory primitive、torque margin checker 和几何级 support polygon
+awareness；MuJoCo/contact 仍属于 MuJoCo。
+
+核心能力：
+
+```text
+foot target to joint angles
+joint limit avoidance
+torque-aware pose selection
+body height control
+foot trajectory generation
+support polygon awareness
+COM-aware stepping
+simple gait state machine
+fall / overload detection
+```
+
+控制开发要带着工程约束：
+
+```text
+不要生成 torque margin 不足的动作
+不要让整机 FEM 中的高风险姿态长期处在高载荷或大变形状态
+不要让脚端轨迹逼近 joint limit
+不要让 body pose 把 COM 推出支撑区域
+```
+
+阶段 3 的输出：
+
+```text
+IK solver
+joint trajectory generator
+gait primitives
+torque margin checker
+control-side safety limits
+simulation-ready actuator commands
+```
+---
+
+
 # Stage 5: Complex Terrain IK
 
 目标：在 Basic motion-4 已经完成 first-light 后，定义复杂地形上的 IK 和运动决策层。

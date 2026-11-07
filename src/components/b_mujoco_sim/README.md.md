@@ -158,3 +158,53 @@ The full repo test suite should also pass:
 ```bash
 uv run python -m unittest discover -s ci
 ```
+
+
+----
+
+
+## MuJoCo: CAD And Control In MuJoCo
+
+MuJoCo XML export、foot contact geometry、准静态支撑反力 proxy 和
+FEM feedback load-case table；闭环 balance 和真实动态步态仍是后续工作。
+
+MuJoCo 模型需要包含：
+
+```text
+link geometry
+realistic mass
+realistic inertia
+joint axes
+joint limits
+actuator torque limits
+actuator velocity limits
+contact geometry
+foot friction
+battery / electronics lumped mass
+controller loop
+```
+
+这一阶段验证：
+
+```text
+能否站立
+能否低速移动
+能否抬腿
+能否转身
+摔倒模式是什么
+哪些关节 torque 经常饱和
+哪些姿态让 COM 变危险
+脚端接触是否稳定
+控制是否依赖不现实的 actuator performance
+```
+
+MuJoCo 结果可能会推翻前面的设计，因此阶段 4 之后还要回到阶段 1/2/3：
+
+```text
+MuJoCo failure
+ -> update load case
+ -> update FEM / CAD
+ -> update mass / inertia
+ -> update IK / control
+ -> simulate again
+```

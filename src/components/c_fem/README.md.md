@@ -37,6 +37,84 @@ AI coding agent 负责把凹轮传动关系正确建进 MuJoCo 模型。选 snap
 
 ---
 
+
+
+以整只机器人作为唯一 FEM 分析对象。这一阶段不建立 single-link、bracket、shaft seat、insert region 或 subassembly 的独立 FEM 路线。局部区域可以在整机结果中表现为 stress / deformation hot spot，但判断、加强和复验都回到 whole-robot FEM 中完成。
+
+FEM FEM load case 应来自阶段 1 的质量、惯量、姿态和 joint torque
+估计，但这一阶段不引入 gravity、ground contact、support reaction 或
+fixed feet。重力、接触和支撑稳定性属于后续 MuJoCo/contact 阶段；MuJoCo
+结果再回灌 FEM，生成新的无重力结构复验工况。
+
+```text
+max joint torque
+continuous joint torque
+worst-case pose
+actuator / battery lumped mass inertia
+waist yaw / pitch extreme pose
+torque replay articulated bend
+motion-slice inertial load from Basic motion
+mesh / material / radius comparison under the same torque replay
+```
+
+FEM 要找：
+
+```text
+global body deformation
+body torsion
+waist load path weakness
+hip frame deformation
+joint axis misalignment
+endpoint deflection under load
+whole-body torque / inertia load distribution
+torque reaction load path
+stress hot spots
+layer delamination risk
+fatigue-sensitive regions
+```
+
+加强方式包括：
+
+```text
+wall thickness change
+rib placement
+fillet radius
+hole relocation
+boss geometry
+print orientation change
+material change
+load path redesign
+standard part substitution
+full-frame stiffness redistribution
+actuator / battery placement change
+```
+
+每次加强之后必须更新：
+
+```text
+mass
+COM
+inertia
+joint torque estimate
+battery estimate if needed
+FEM result
+```
+
+阶段 2 是一个循环：
+
+```text
+whole-robot FEM stress / deformation hot spot
+ -> full-model geometry reinforcement
+ -> mass update
+ -> torque update
+ -> COM update
+ -> new whole-robot FEM load case
+ -> whole-robot FEM again
+```
+
+
+---
+
 # FEM OpenRadioss First Light
 
 整机结构，而是确认 FEM 的外部 solver 链路真的可用：
