@@ -20,13 +20,15 @@ from typing import Any
 import numpy as np
 import yaml
 
-from src.components.z_common.legacy_configuration import read_configuration
+from markdown_it import MarkdownIt
+from markdown_it.tree import SyntaxTreeNode
 from src.components.z_common.dog_description import DEFAULT_DESCRIPTION_PATH, DogDescription, load_dog_description
 from src.components.z_common.endpoint_geometry import LEG_ORDER, RobotGeometry, foot_points, waist_joint_points
 
 
 DEFAULT_MATERIALS_PATH = Path(__file__).resolve().parents[3] / "vendor/components/material/lists.md"
 DEFAULT_ACTUATORS_PATH = Path(__file__).resolve().parents[3] / "vendor/components/joint/lists.md"
+DEFAULT_ELECTRONICS_PATH = Path(__file__).resolve().parents[3] / "vendor/components/electronics/lists.md"
 DEFAULT_BATTERIES_PATH = Path(__file__).resolve().parents[3] / "vendor/components/battery/lists.md"
 
 
@@ -226,11 +228,31 @@ def normalized(vector: np.ndarray) -> np.ndarray:
     return vector / norm
 
 
-def configuration_mapping(path: Path, label: str) -> Mapping[str, Any]:
-    raw = read_configuration(path)
-    if not isinstance(raw, Mapping):
-        raise ValueError(f"{label} must be a mapping")
-    return raw
+def _component_rows(path: Path, id_column: str) -> dict[str, dict[str, str]]:
+    """Read a single component table for this mass-model caller using markdown-it-py."""
+    tree = SyntaxTreeNode(MarkdownIt("commonmark").enable("table").parse(Path(path).read_text()))
+    tables = [node for node in tree.walk() if node.type == "table"]
+    if len(tables) != 1:
+        raise ValueError(f"{path}: expected exactly one component table")
+    table = tables[0]
+    columns = [cell.children[0].content for cell in table.children[0].children[0].children]
+    if len(set(columns)) != len(columns):
+        raise ValueError(f"{path}: duplicate column names")
+    if id_column not in columns:
+        raise ValueError(f"{path}: required column {id_column!r} is missing")
+    records = {}
+    for section in table.children:
+        if section.type != "tbody":
+            continue
+        for row in section.children:
+            record = dict(zip(columns, [cell.children[0].content for cell in row.children]))
+            name = record[id_column].strip()
+            if not name or name in records:
+                raise ValueError(f"{path}: empty or duplicate component ID {name!r}")
+            records[name] = record
+    if not records:
+        raise ValueError(f"{path}: no components found")
+    return records
 
 
 def as_mapping(value: Any, label: str) -> Mapping[str, Any]:
@@ -249,7 +271,10 @@ def required_float(parent: Mapping[str, Any], key: str, label: str) -> float:
     if key not in parent:
         raise ValueError(f"{label}.{key} is required")
     try:
-        return float(parent[key])
+        value = float(parent[key])
+        if not math.isfinite(value):
+            raise ValueError("non-finite number")
+        return value
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{label}.{key} must be numeric") from exc
 
@@ -270,90 +295,99 @@ def mount_frame_value(parent: Mapping[str, Any], label: str) -> str:
     return value
 
 
-def load_materials(path: Path) -> tuple[dict[str, Material], str, str]:
-    data = configuration_mapping(path, "materials")
-    materials_raw = required_mapping(data, "materials", "materials")
+def load_materials(
+    path: Path, *, structural_material: str | None = None, elastomer_material: str | None = None,
+) -> tuple[dict[str, Material], str, str]:
+    rows = _component_rows(path, "ID")
     materials = {
-        name: Material(
-            name=str(name),
-            density_kg_m3=required_float(as_mapping(item, f"materials.{name}"), "density_kg_m3", f"materials.{name}"),
-            properties=as_mapping(item, f"materials.{name}"),
-        )
-        for name, item in materials_raw.items()
+        name: Material(name=name, density_kg_m3=required_float(item, "density_kg_m3", f"{path}: {name}"), properties=item)
+        for name, item in rows.items()
     }
-    structural = str(data.get("default_structural_material", ""))
-    elastomer = str(data.get("default_elastomer_material", ""))
-    if structural not in materials:
-        raise ValueError("default_structural_material must name a material")
-    if elastomer not in materials:
-        raise ValueError("default_elastomer_material must name a material")
-    return materials, structural, elastomer
+    for field, value in [("structural_material", structural_material), ("elastomer_material", elastomer_material)]:
+        if value is None:
+            raise ValueError(f"{path}: {field} selection is required from the caller")
+        if value not in materials:
+            raise ValueError(f"{path}: {field} references unknown material {value!r}")
+    return materials, structural_material, elastomer_material
 
 
-def load_actuators(path: Path) -> tuple[dict[str, Actuator], dict[str, str]]:
-    data = configuration_mapping(path, "actuators")
-    actuators_raw = required_mapping(data, "actuators", "actuators")
+def load_actuators(
+    path: Path, *, assignments: Mapping[str, str] | None = None,
+) -> tuple[dict[str, Actuator], dict[str, str]]:
+    rows = _component_rows(path, "厂商/型号")
     actuators = {}
-    for name, item in actuators_raw.items():
-        item_map = as_mapping(item, f"actuators.{name}")
-        actuators[str(name)] = Actuator(
-            name=str(name),
-            mass_kg=required_float(item_map, "mass_kg", f"actuators.{name}"),
-            driver_mass_kg=required_float(item_map, "driver_mass_kg", f"actuators.{name}"),
-            continuous_torque_nm=required_float(item_map, "continuous_torque_nm", f"actuators.{name}"),
-            max_torque_nm=required_float(item_map, "max_torque_nm", f"actuators.{name}"),
-            properties=item_map,
-        )
-    assignments = {str(k): str(v) for k, v in required_mapping(data, "default_actuator_set", "actuators").items()}
-    for joint_type, actuator_name in assignments.items():
-        if actuator_name not in actuators:
-            raise ValueError(f"default_actuator_set.{joint_type} references unknown actuator {actuator_name}")
-    return actuators, assignments
+    for name, item in rows.items():
+        label = f"{path}: {name}"
+        # Keep original columns (including Sources), and explicitly convert grams to kg.
+        mass = required_float(item, "重量 g", label) / 1000.0
+        continuous = required_float(item, "额定/持续扭矩 N·m", label)
+        peak = required_float(item, "峰值/最大扭矩 N·m", label)
+        driver_mass = required_float(item, "driver_mass_kg", label)
+        actuators[name] = Actuator(name=name, mass_kg=mass, driver_mass_kg=driver_mass,
+                                   continuous_torque_nm=continuous, max_torque_nm=peak, properties=item)
+    if assignments is None:
+        raise ValueError(f"{path}: actuator assignments are required from the caller")
+    required_joints = {"waist_yaw", "waist_pitch", "hip_ab", "hip_pitch", "knee_bend",
+                       "toe_bend", "neck_yaw", "neck_pitch", "head_claw"}
+    missing = required_joints - assignments.keys()
+    if missing:
+        raise ValueError(f"{path}: missing actuator assignments: {', '.join(sorted(missing))}")
+    for joint, name in assignments.items():
+        if name not in actuators:
+            raise ValueError(f"{path}: assignment {joint!r} references unknown actuator {name!r}")
+    return actuators, dict(assignments)
 
 
-def load_battery_and_electronics(path: Path) -> tuple[Battery, list[ElectronicsItem]]:
-    data = configuration_mapping(path, "batteries")
-    batteries_raw = required_mapping(data, "batteries", "batteries")
-    default_battery = str(data.get("default_battery", ""))
-    if default_battery not in batteries_raw:
-        raise ValueError("default_battery must name a battery")
-    battery_map = as_mapping(batteries_raw[default_battery], f"batteries.{default_battery}")
-    battery = Battery(
-        name=default_battery,
-        mass_kg=required_float(battery_map, "mass_kg", f"batteries.{default_battery}"),
-        mount_frame=mount_frame_value(battery_map, f"batteries.{default_battery}"),
-        placement_m=placement_vector(battery_map, f"batteries.{default_battery}"),
-        properties=battery_map,
-    )
-
+def load_battery_and_electronics(
+    path: Path, *, battery_name: str | None = None,
+    battery_mount: Mapping[str, Any] | None = None,
+    electronics_path: Path = DEFAULT_ELECTRONICS_PATH,
+    electronics_mounts: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[Battery, list[ElectronicsItem]]:
+    batteries = _component_rows(path, "ID")
+    electronics_rows = _component_rows(electronics_path, "ID")
+    if battery_name is None:
+        raise ValueError(f"{path}: battery_name selection is required from the caller")
+    if battery_name not in batteries:
+        raise ValueError(f"{path}: unknown battery {battery_name!r}")
+    label = f"{path}: {battery_name}"
+    if battery_mount is None:
+        raise ValueError(f"{label}: battery_mount (mount_frame, placement_m) is required from the caller")
+    item = batteries[battery_name]
+    battery = Battery(name=battery_name, mass_kg=required_float(item, "mass_kg", label),
+                      mount_frame=mount_frame_value(battery_mount, label),
+                      placement_m=placement_vector(battery_mount, label), properties=item)
+    if electronics_mounts is None:
+        raise ValueError(f"{electronics_path}: electronics_mounts selection is required from the caller; pass {{}} for no electronics")
     electronics = []
-    for name, item in required_mapping(data, "electronics", "batteries").items():
-        item_map = as_mapping(item, f"electronics.{name}")
-        electronics.append(
-            ElectronicsItem(
-                name=str(name),
-                mass_kg=required_float(item_map, "mass_kg", f"electronics.{name}"),
-                mount_frame=mount_frame_value(item_map, f"electronics.{name}"),
-                placement_m=placement_vector(item_map, f"electronics.{name}"),
-                properties=item_map,
-            )
-        )
+    for name, mount in electronics_mounts.items():
+        if name not in electronics_rows:
+            raise ValueError(f"{electronics_path}: unknown electronics component {name!r}")
+        label = f"{electronics_path}: {name}"
+        item = electronics_rows[name]
+        electronics.append(ElectronicsItem(name=name, mass_kg=required_float(item, "mass_kg", label),
+                                          mount_frame=mount_frame_value(mount, label),
+                                          placement_m=placement_vector(mount, label), properties=item))
     return battery, electronics
 
 
-def load_catalog(materials_path: Path, actuators_path: Path, batteries_path: Path) -> PhysicalCatalog:
-    materials, structural, elastomer = load_materials(materials_path)
-    actuators, assignments = load_actuators(actuators_path)
-    battery, electronics = load_battery_and_electronics(batteries_path)
-    return PhysicalCatalog(
-        materials=materials,
-        structural_material=structural,
-        elastomer_material=elastomer,
-        actuators=actuators,
-        actuator_assignments=assignments,
-        battery=battery,
-        electronics=electronics,
-    )
+def load_catalog(
+    materials_path: Path, actuators_path: Path, batteries_path: Path, *,
+    structural_material: str | None = None, elastomer_material: str | None = None,
+    actuator_assignments: Mapping[str, str] | None = None, battery_name: str | None = None,
+    battery_mount: Mapping[str, Any] | None = None,
+    electronics_path: Path = DEFAULT_ELECTRONICS_PATH,
+    electronics_mounts: Mapping[str, Mapping[str, Any]] | None = None,
+) -> PhysicalCatalog:
+    materials, structural, elastomer = load_materials(
+        materials_path, structural_material=structural_material, elastomer_material=elastomer_material)
+    actuators, assignments = load_actuators(actuators_path, assignments=actuator_assignments)
+    battery, electronics = load_battery_and_electronics(
+        batteries_path, battery_name=battery_name, battery_mount=battery_mount,
+        electronics_path=electronics_path, electronics_mounts=electronics_mounts)
+    return PhysicalCatalog(materials=materials, structural_material=structural,
+                           elastomer_material=elastomer, actuators=actuators,
+                           actuator_assignments=assignments, battery=battery, electronics=electronics)
 
 
 def robot_geometry(description: DogDescription) -> RobotGeometry:

@@ -183,7 +183,7 @@ def make_joint_spec(
 ) -> MujocoJointSpec:
     spec = description.joint_ranges[joint_type]
     actuator = actuator_for_joint_type(catalog, joint_type)
-    speed = float(actuator.properties.get("max_speed_rad_s", 0.0))
+    speed = basic_motion.required_float(actuator.properties, "max_speed_rad_s", f"actuators.{actuator.name}")
     return MujocoJointSpec(
         name=name,
         joint_type=joint_type,
