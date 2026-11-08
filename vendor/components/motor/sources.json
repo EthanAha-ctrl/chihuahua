@@ -28,5 +28,10 @@
     "file": "ri30/RI30 3D Drawing.STEP",
     "source_archive": "ri30 ZIP",
     "sha256": "6f384c270c043b847bc0db289e226749a179c8af634fdbb0afdf995e4c777264"
+  },
+  {
+    "file": "solo12_driver.yaml",
+    "url": "https://github.com/open-dynamic-robot-initiative/robot_properties_solo/blob/2201f454f4caffa0cad307fa8cbd1d64dd844008/src/robot_properties_solo/resources/odri_control_interface/solo12_driver.yaml",
+    "sha256": "a933f7c728ffe3f54d28b401a8601e5d2480b32d1286974328c23e0fcc38d7e8"
   }
 ]

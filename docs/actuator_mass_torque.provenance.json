@@ -5,8 +5,8 @@
     "src/components/z_common/plot_actuator_mass_torque.py": "c75ff21e36504398a362fe4606b1966c19c5abaf",
     "uv.lock": "fed83b533b6938deab82c27e967dacd29f31d489",
     "vendor/components/joint/lists.md": "9f690e340c270392e726302b6f1492a1ad02622b",
-    "vendor/components/motor/lists.md": "acdad0ac0125d8508f0f673d3d9a341c8c63ddf8"
+    "vendor/components/motor/lists.md": "ad06b7caa73dab77dae2cac4b34501de8a710971"
   },
-  "output_blob": "7bdd8d406f70f6503a92293a89a7ad0f68b8675c",
-  "source_base_commit": "948fd0487a36eef8ee794f00c564bb1fc7b2cfb9"
+  "output_blob": "8b592b116255ea7cf70ea130b92067cb32d9682c",
+  "source_base_commit": "457908831a8ae2f687c24202ad6979d0372edc73"
 }
