@@ -14,3 +14,4 @@
 - Say in academic literature tone.
 - `尚不足以证明xxx` 等等 defensive tone , 换一种tone: 说 `但是 xxx 就不知道了`
 - Remember, the user is smarter than coding agent.
+- `需要区分两个目标` is nothing but bullshit. don't say it.
