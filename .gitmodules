@@ -14,5 +14,5 @@
 	path = reference/astool
 	url = https://github.com/hardmaru/astool.git
 [submodule "vendor/reference/robot_properties_solo"]
-	path = vendor/reference/robot_properties_solo
+	path = vendor/reference/urdf/solo
 	url = https://github.com/open-dynamic-robot-initiative/robot_properties_solo.git
