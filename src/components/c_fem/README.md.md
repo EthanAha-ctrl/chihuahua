@@ -1216,3 +1216,23 @@ geometry optimizer
 ```text
 Chihuahua-like morphology search bench
 ```
+
+
+---
+
+Verification of the FEM toolchain:
+
+用免费、开源、真正基于 FEM/FEA 的工具，复现意大利面首次折断及后续断裂级联，并通过实验检验预测能力。
+
+- 找到的具体代码：[`aces-research/beamit`](https://github.com/aces-research/beamit)。它是 Python 编写的专用梁有限元求解器，使用 **DG-FEM＋内聚区模型（CZM）**，采用 MIT 许可证，无须商业 FEA 软件。仓库有 `released_spaghetti_fracture.py`，模拟预弯曲梁释放一端后，弯曲波引发后续断裂。**我们尚未验证默认算例能让整根面条断成 3、4、5 段。**
+    
+- **移植到 OpenRadioss 的可行性**：弹性梁动力学可以建立对应模型；完整保留 `beamit` 的拉力—弯矩耦合起裂、软化和卸载规律，需要自定义连接模型。严格保留 DG 离散还需要更多开发。
+    
+- **发现的关键差异**：TYPE3 的拉伸应变失效不能直接代表受弯外缘断裂；TYPE18 能考虑截面弯曲应变，但其损伤机制与 `beamit` 不同。另外，`beamit` 的 **25 MPa 是有效内聚强度**，不能直接填成普通材料抗拉强度。
+    
+- **软件选择**：没有证据证明 OpenRadioss 是这个问题的最佳工具。当前建议是先用 **beamit 建立研究基准**；如果最终要求通用工程 FEA 平台，再评估移植。MOOSE 也是候选，但尚未找到可直接使用的 spaghetti 级联算例。
+    
+- **项目状态变化**：上次查询发现原 OpenRadioss 官方仓库已不可访问，源码仍有公开存档；[OpenCourant](https://opencourant.org/) 是社区延续项目。后续需要锁定具体版本。
+    
+
+建议的迭代顺序是：**先验证弯曲波 → 验证单次断裂 → 验证断裂级联**。最终同时比较段数、断裂位置、时间和段长分布，并检查网格与时间步长收敛；单次恰好断成四段不足以证明准确性。

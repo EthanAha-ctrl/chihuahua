@@ -1,0 +1,18 @@
+[submodule "reference/derl"]
+	path = reference/derl
+	url = https://github.com/agrimgupta92/derl.git
+[submodule "reference/evogym"]
+	path = reference/evogym
+	url = https://github.com/EvolutionGym/evogym.git
+[submodule "reference/virtual-creatures"]
+	path = reference/virtual-creatures
+	url = https://github.com/nickmeinhold/virtual-creatures.git
+[submodule "reference/nlimb"]
+	path = reference/nlimb
+	url = https://github.com/cbschaff/nlimb.git
+[submodule "reference/astool"]
+	path = reference/astool
+	url = https://github.com/hardmaru/astool.git
+[submodule "vendor/reference/robot_properties_solo"]
+	path = vendor/reference/robot_properties_solo
+	url = https://github.com/open-dynamic-robot-initiative/robot_properties_solo.git

@@ -6,6 +6,7 @@
 | Aibo ERS-7 | [urdf/aibo_ers7/](urdf/aibo_ers7/) | [dkotfis/aibo_ros @ eec7a9d](https://github.com/dkotfis/aibo_ros/tree/eec7a9dc21779a289eb3bfa48d66cedd830176d3/aibo_description) | MIT |
 | Chihuahua | [Geometry and joint ranges](urdf/chihuahua/lists.md) | Repository design configuration, including original references | Internal configuration |
 | Pupper v3 | [urdf/pupper_v3/](urdf/pupper_v3/) | [G-Levine/pupper_v3_description @ 1a3c859](https://github.com/G-Levine/pupper_v3_description/tree/1a3c8590189d3a406219d155f4177afc491a7d77) | MIT |
+| Solo 12 / Solo 8 | [robot_properties_solo/](robot_properties_solo/) (Git submodule; Xacro and meshes) | [open-dynamic-robot-initiative/robot_properties_solo @ 2201f45](https://github.com/open-dynamic-robot-initiative/robot_properties_solo/tree/2201f454f4caffa0cad307fa8cbd1d64dd844008) | BSD-3-Clause |
 
 [Model adaptations, kinematic provenance and audit details](urdf/README.md).
 URDFs, source meshes, licenses and runtime audit metadata are retained together.

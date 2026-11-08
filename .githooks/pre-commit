@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+PATH="$root/.tools/uv:$PATH"
+export PATH
+if ! command -v uv >/dev/null 2>&1; then
+    echo 'FATAL: uv is required for commit preflight; install uv and run uv sync --locked.' >&2
+    exit 1
+fi
+# Load the staged preflight, so partial staging cannot execute a different version.
+cd "$root"
+if ! git diff --quiet -- .githooks/pre-commit ci/commit_preflight.py src/components/z_common/plot_actuator_mass_torque.py pyproject.toml uv.lock; then
+    echo 'FATAL: preflight code or uv dependencies have unstaged changes. Stage the intended versions together before committing.' >&2
+    exit 1
+fi
+exec uv run --locked python -c 'import subprocess; exec(compile(subprocess.check_output(["git", "show", ":ci/commit_preflight.py"]), "ci/commit_preflight.py", "exec"))'
