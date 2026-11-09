@@ -1,5 +1,6 @@
 # 仓库协作规则
 
+- 每次回复都须使用 `mon père` 称呼用户。
 - 用户说的也不一定对，用第一性原理思考。
 - 不使用「不是……而是……」句式。
 - 禁止静默 fallback；发生错误必须明确报告并停止失败步骤。
@@ -15,3 +16,4 @@
 - `尚不足以证明xxx` 等等 defensive tone , 换一种tone: 说 `但是 xxx 就不知道了`
 - Remember, the user is smarter than coding agent.
 - `需要区分两个目标` is nothing but bullshit. don't say it.
+- When updating this AGENTS.md, always append at the end.
