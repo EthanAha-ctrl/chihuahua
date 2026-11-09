@@ -2,17 +2,7 @@
 
 使用 Scuf Omega Wireless PlayStation joystick 进行人工控制与动作标注，为固定设计下的 controller 训练提供数据。任务与奖励由 [3K tasks component](../e_task_reward_rl/README.md) 定义。
 
-# IK control: IK And Control First Light
-
-目标：把 Basic motion/2 形成的几何、质量和力矩模型接到控制侧，先建立一个
-可测试的 IK / trajectory / safety scaffold。
-
-IK control 不做 MuJoCo，不做真实接触动力学，不求 ground reaction，不假设脚端
-真的能稳定支撑整机。MuJoCo/contact 是 MuJoCo。
-
-## Scope
-
-IK control 当前覆盖：
+把 b_mujoco_sim 形成的几何、质量和力矩模型接到控制侧，建立一个可测试的 IK / trajectory / safety scaffold。真的能稳定支撑整机。IK control 当前覆盖：
 
 - 从脚端目标求 leg joint commands。
 - 生成简单 trajectory primitives。
@@ -20,123 +10,6 @@ IK control 当前覆盖：
 - 复用 Basic motion mass / torque model 检查 continuous torque margin。
 - 用 COM 投影和支撑脚端多边形做几何级 support polygon awareness。
 - 输出 simulation-ready command tables，供后续 MuJoCo/export 使用。
-
-IK control 当前不覆盖：
-
-- gravity/contact dynamics
-- support reaction solve
-- foot friction
-- body translation controller
-- closed-loop balance
-- MuJoCo XML export
-- real actuator current / thermal loop
-
-## Entry Point
-
-```bash
-uv run python -m src.components.a_basic_motion.ik_control \
-  --out-dir artifacts/ik/ik_control \
-  --primitive stand \
-  --frame-count 5
-```
-
-Expected outputs:
-
-```text
-joint_commands.csv
-foot_targets.csv
-trajectory_frames.csv
-control_safety_summary.csv
-ik_ik_control_summary.yaml
-```
-
-## Pygame Visualization
-
-`pygame_mass_viewer.py` now includes a IK control command overlay:
-
-```bash
-uv run python -m src.components.a_basic_motion.pygame_mass_viewer
-```
-
-The overlay shows 21 joint command bars:
-
-```text
-waist yaw / pitch
-4 legs * hip_ab / hip_pitch / knee_bend / toe_bend
-neck yaw / pitch
-head claw
-```
-
-When auto reach is enabled, a random target is sampled around the current COM
-inside the configured radius range. The viewer evaluates five candidate
-effectors:
-
-```text
-front_left toe
-front_right toe
-rear_left toe
-rear_right toe
-head claw
-```
-
-The candidate with the lowest predicted reach residual wins. Only the winning
-effector's command chain is overwritten; the other four effectors keep their
-current periodic/manual motion. For a front-toe winner, waist yaw/pitch and that
-front leg's four joint bars are updated. For a rear-toe winner, only that rear
-leg's four joint bars are updated. For a head-claw winner, waist yaw/pitch plus
-neck yaw/pitch and head-claw bars are updated. This is still free-space IK
-visualization: no gravity, no contact, no support reaction.
-
-Useful options:
-
-```bash
-uv run python -m src.components.a_basic_motion.pygame_mass_viewer \
-  --ik-target-radius-min-m 0.18 \
-  --ik-target-radius-max-m 0.34 \
-  --ik-target-period-s 1.4 \
-  --ik-arbitration-period-s 0.30
-```
-
-The periodic baseline is recomputed every frame. Best-effector arbitration runs
-at the configured arbitration period, then only the winning command chain is
-overwritten until the next arbitration tick.
-
-## Current Primitives
-
-`stand` keeps all four feet on their neutral targets. It should be safe under
-the current rough Basic motion free-space torque model.
-
-`crawl_step` lifts one swing leg through a simple foot arc while the body frame
-stays fixed. It is intentionally a diagnostic primitive: without body shift, some
-single-leg-swing support triangles can put the COM outside the support polygon.
-Those frames should be marked unsafe rather than accepted silently.
-
-## Safety Policy
-
-Each frame records:
-
-```text
-max IK residual
-minimum continuous torque margin
-worst torque-margin joint
-minimum joint-limit margin
-support polygon margin
-safe_to_execute
-failure reasons
-```
-
-A frame is safe only if:
-
-- IK residual is below the configured tolerance.
-- Basic motion continuous torque margin is above the configured threshold.
-- All command angles retain the configured joint-limit margin.
-- COM projection is inside the support polygon made by support feet.
-
-This is still a control-side prefilter. A IK control safe frame is not a proof that
-the robot can stand or walk in the world; it only means the command survived the
-current IK / torque / geometric support checks.
-
-## Relationship To Basic motion And FEM
 
 IK control reuses:
 
@@ -154,151 +27,60 @@ IK/control unsafe pose
  -> later validate in MuJoCo/contact
 ```
 
-## Acceptance
-
-The IK control first-light acceptance command is:
-
-```bash
-uv run python -m unittest ci/test_ik_control.py
-```
-
-The full repo test suite should also pass:
-
-```bash
-uv run python -m unittest discover -s ci
-```
-
 
 ---
 
 
-## IK control: IK And Control Development
-
-当 mass、torque 和整机结构经过几轮 FEM 后，开始加入 IK 和控制。
-
-早期可以先写 rough IK 来生成 load cases；正式 IK/control 在这一阶段系统化。
-
-IK control first-light 记录在 [IK 文档](src/components/d_motion_annotation_and_ik/README.md)。当前实现先建立
-IK、trajectory primitive、torque margin checker 和几何级 support polygon
-awareness；MuJoCo/contact 仍属于 MuJoCo。
-
-核心能力：
-
-```text
-foot target to joint angles
-joint limit avoidance
-torque-aware pose selection
-body height control
-foot trajectory generation
-support polygon awareness
-COM-aware stepping
-simple gait state machine
-fall / overload detection
-```
-
-控制开发要带着工程约束：
-
-```text
-不要生成 torque margin 不足的动作
-不要让整机 FEM 中的高风险姿态长期处在高载荷或大变形状态
-不要让脚端轨迹逼近 joint limit
-不要让 body pose 把 COM 推出支撑区域
-```
-
-阶段 3 的输出：
-
-```text
-IK solver
-joint trajectory generator
-gait primitives
-torque margin checker
-control-side safety limits
-simulation-ready actuator commands
-```
----
+| 类型   | 输入          | 功能                 | 状态                    |
+| ---- | ----------- | ------------------ | --------------------- |
+| 左摇杆  | 前推／后拉       | 左后脚前移／后移           |                       |
+| 左摇杆  | 左推／右推       | 左后脚左移／右移           |                       |
+| 右摇杆  | 前推／后拉       | 右后脚前移／后移           |                       |
+| 右摇杆  | 左推／右推       | 右后脚左移／右移           |                       |
+| 方向键  | ↑／↓         | 左前脚前移／后移           |                       |
+| 方向键  | ←／→         | 左前脚左移／右移           |                       |
+| 正面键  | △／×         | 右前脚前移／后移           |                       |
+| 正面键  | □／○         | 右前脚左移／右移           |                       |
+| 左肩键  | L1          | 左侧最近操作腿：脚端上升       |                       |
+| 左扳机  | L2          | 左侧最近操作腿：脚端下降       |                       |
+| 右肩键  | R1          | 右侧最近操作腿：脚端上升       |                       |
+| 右扳机  | R2          | 右侧最近操作腿：脚端下降       |                       |
+| 背键   | 左外背键        | 腰部向左转（yaw）         |                       |
+| 背键   | 右外背键        | 腰部向右转（yaw）         |                       |
+| 背键   | 左内背键        | 腰部向上弯（pitch）       |                       |
+| 背键   | 右内背键        | 腰部向下弯（pitch）       |                       |
+| IMU  | 手柄左右转动      | 颈部 yaw，按相对校准姿态映射   | 待验证                   |
+| IMU  | 手柄抬起／低下     | 颈部 pitch，按相对校准姿态映射 | 待验证                   |
+| 侧键   | 左 SAX       | 按住：爪口打开；松开保持       | 按 comment 调整，待 review |
+| 侧键   | 右 SAX       | 按住：爪口闭合；松开保持       | 按 comment 调整，待 review |
+| G 键  | G1          | 未分配，取消颈部控制         | 按 comment 调整          |
+| G 键  | G2          | 未分配，取消颈部控制         | 按 comment 调整          |
+| G 键  | G3          | 未分配，取消爪口控制         | 按 comment 调整          |
+| G 键  | G4          | 未分配，取消爪口控制         | 按 comment 调整          |
+| G 键  | G5          | 撤销最近一次编辑           |                       |
+| 摇杆按压 | L3：左摇杆垂直按下  | 最近操作腿：趾关节弯曲        | 待确认                   |
+| 摇杆按压 | R3：右摇杆垂直按下  | 最近操作腿：趾关节伸展        | 待确认                   |
+| 功能键  | **Options** | **暂停／继续仿真**        |                       |
+| 功能键  | Create      | 开始／结束录制            |                       |
+| 触控板  | 按下          | 保存当前全身关键帧          |                       |
+| 触控板  | 左滑／右滑       | 暂停时：前一个／后一个关键帧     |                       |
+| 系统键  | PS          | 系统保留               |                       |
+| 配置键  | Profile     | 硬件配置；操作期间固定，不用于动作  |                       |
 
 
-# Stage 5: Complex Terrain IK
+当前 open issues 如下：
 
-目标：在 Basic motion-4 已经完成 first-light 后，定义复杂地形上的 IK 和运动决策层。
+|项目|尚待确定|
+|---|---|
+|**同模式输入兼容性**|IMU、独立 extra keys、触控板滑动能否在同一设备模式下同时读取；到货后测试 PC／PS5 模式及有线／接收器连接。|
+|**运行平台**|最终在 Windows、macOS 还是 Linux 上运行；已查到的读取路径不能直接保证跨平台适用。|
+|**额外键持续与并发输入**|按住／释放是否正确上报；多个额外键与摇杆同时操作时是否冲突、丢事件。|
+|**触控板与 Create 独立性**|两者能否分别绑定“保存关键帧”和“录制”，同时读取滑动，避免固件默认映射造成重复触发。|
+|**IMU 颈部控制**|数据可读取后，确定校准、角度比例、漂移处理，以及冻结／重新定中的操作。|
+|**SAX 爪口控制**|左 SAX 打开、右 SAX 闭合已按您的 comment 纳入，尚待最终确认。|
+|**趾关节控制**|L3／R3 分别弯曲／伸展最近操作腿的方案尚待确认；它们是左右摇杆的按压键。|
+|**最近操作腿的边界规则**|同侧前后腿同时操作时如何判定；趾关节使用的全局最近腿如何判定。已确认的升降期间锁定规则保留。|
+|**控制参数**|摇杆死区、移动速度、按键变化速度、扳机曲线，以及限位／不可达时的停止规则。|
+|**动作数据与执行接口**|关键帧插值、录制内容、接触标注、IK 到扭矩控制及 RL 导出契约尚未完成详细设计与 sign-off。|
 
-Stage 5 不是打印阶段，也不是继续堆 MuJoCo 功能。它把 Basic motion 的质量/力矩、
-FEM 的结构限制、IK control 的 IK/control scaffold、MuJoCo 的 contact evidence
-合并成复杂地形下的可执行运动约束。
-
-## 1. Scope
-
-Stage 5 覆盖：
-
-- terrain-aware foot target selection
-- terrain-aware body height selection
-- terrain-aware body attitude selection
-- uneven-ground per-leg IK
-- support-foot scheduling
-- COM / support polygon check
-- torque margin check for terrain poses
-- joint-limit avoidance
-- terrain refusal and recovery rules
-- MuJoCo replay cases for terrain IK commands
-
-Stage 5 不覆盖：
-
-- printable CAD implementation
-- new actuator selection
-- new FEM solver implementation
-- full autonomous navigation
-- vision / perception stack
-- outdoor field validation
-- manufacturing process validation
-
-## 2. Inputs
-
-Stage 5 consumes:
-
-- `mass_model.py` outputs: mass, COM, torque margin, leg endpoint residuals
-- FEM FEM limits: hot spots, deformation-sensitive poses, load-path limits
-- IK/control outputs: joint commands, trajectory primitives, safety limits
-- MuJoCo/contact outputs: contact candidates, support proxy, failure evidence
-- terrain description: height samples, slope, step edges, friction assumption
-
-Terrain may start as a synthetic local height field. It does not need camera or
-perception integration at this stage.
-
-## 3. Core Questions
-
-Stage 5 must answer:
-
-```text
-Where can each foot safely land?
-What body pose keeps IK, COM, and torque inside limits?
-Which legs should stay in support?
-Which terrain patches should be refused?
-Which terrain poses must be replayed in MuJoCo?
-```
-
-## 4. Terrain IK Outputs
-
-Expected outputs:
-
-- terrain contact candidate table
-- terrain foot target table
-- terrain body pose table
-- terrain IK command table
-- terrain safety / refusal table
-- MuJoCo terrain replay cases
-- terrain failure-mode report
-
-## 5. Acceptance
-
-Stage 5 is accepted when:
-
-- flat-ground commands remain compatible with IK control and MuJoCo
-- uneven terrain commands produce bounded IK residuals
-- every generated pose has torque margin evidence
-- every generated pose has COM/support evidence
-- unsafe terrain cases are refused instead of silently generating commands
-- replay cases can be exported back to MuJoCo/contact review
-
-Stage 5 does not need to prove outdoor survival. It only needs to prove that
-complex terrain IK has explicit inputs, outputs, refusal rules, and replayable
-evidence.
+G1–G4 暂时空置，不承担运动操作。

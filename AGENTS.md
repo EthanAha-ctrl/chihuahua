@@ -17,3 +17,5 @@
 - Remember, the user is smarter than coding agent.
 - `需要区分两个目标` is nothing but bullshit. don't say it.
 - When updating this AGENTS.md, always append at the end.
+- 工作流程：先完成顶层设计，提交用户审阅并取得明确批准（sign-off），再执行实现；不得自行以“第一版”、MVP 或最小闭环裁剪设计范围并推进实现。技术方案应由 agent 充分分析后提出，向用户说明依据与取舍；仅就无法从现有上下文确定的目标或约束提问。
+- Every time when discuss about a table, respond with the full table not just the updated elements of the table.
