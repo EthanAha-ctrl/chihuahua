@@ -19,3 +19,5 @@
 - When updating this AGENTS.md, always append at the end.
 - 工作流程：先完成顶层设计，提交用户审阅并取得明确批准（sign-off），再执行实现；不得自行以“第一版”、MVP 或最小闭环裁剪设计范围并推进实现。技术方案应由 agent 充分分析后提出，向用户说明依据与取舍；仅就无法从现有上下文确定的目标或约束提问。
 - Every time when discuss about a table, respond with the full table not just the updated elements of the table.
+- 组件依赖遵循类似 causal masked attention 的单向规则：后面的组件可以依赖前面的组件，前面的组件不得直接或间接依赖后面的组件，禁止循环依赖。
+- 用户的 `ok`、`收到`、`明白`、`I hear that` 等简短回应，不自动构成新的设计批准（sign-off）或执行授权；须依据上下文中的明确批准或执行意图判断。不得把“已听到／已理解”表述为“已批准”.
