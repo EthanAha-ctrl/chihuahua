@@ -16,3 +16,12 @@
 [submodule "vendor/reference/robot_properties_solo"]
 	path = vendor/reference/urdf/solo
 	url = https://github.com/open-dynamic-robot-initiative/robot_properties_solo.git
+[submodule "reference/mjlab"]
+	path = reference/mjlab
+	url = https://github.com/mujocolab/mjlab.git
+[submodule "reference/rsl_rl"]
+	path = reference/rsl_rl
+	url = https://github.com/leggedrobotics/rsl_rl.git
+[submodule "reference/protomotions"]
+	path = reference/protomotions
+	url = https://github.com/NVlabs/ProtoMotions.git
