@@ -25,3 +25,15 @@
 [submodule "reference/protomotions"]
 	path = reference/protomotions
 	url = https://github.com/NVlabs/ProtoMotions.git
+[submodule "reference/mann"]
+	path = reference/mann
+	url = https://github.com/cghezhang/MANN.git
+[submodule "reference/motion_imitation"]
+	path = reference/motion_imitation
+	url = https://github.com/erwincoumans/motion_imitation.git
+[submodule "reference/t2qrm"]
+	path = reference/t2qrm
+	url = https://github.com/SCUT-BIP-Lab/T2QRM.git
+[submodule "reference/interpet4d_post"]
+	path = reference/interpet4d_post
+	url = https://github.com/puckikk1202/interpet4d_post.git
