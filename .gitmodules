@@ -37,3 +37,9 @@
 [submodule "reference/interpet4d_post"]
 	path = reference/interpet4d_post
 	url = https://github.com/puckikk1202/interpet4d_post.git
+[submodule "reference/ai4animationpy"]
+	path = reference/ai4animationpy
+	url = https://github.com/facebookresearch/ai4animationpy.git
+[submodule "reference/ai4animation"]
+	path = reference/ai4animation
+	url = https://github.com/sebastianstarke/AI4Animation.git
