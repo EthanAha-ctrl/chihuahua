@@ -1,0 +1,26 @@
+diff --git a/setup.py b/setup.py
+index e8a1fad..e9ca461 100644
+--- a/setup.py
++++ b/setup.py
+@@ -18,10 +18,8 @@ setup(
+     },
+     python_requires=">=3.12.12",
+     install_requires=[
+-        "raylib==5.5",
+-        "numpy==1.26.4",
++        "numpy>=1.26.4,<3",
+         "pygltflib==1.16.5",
+-        "pyscreenrec==0.6",
+         "torch>=2.0.0",
+         "torchvision>=0.15.0",
+         "torchaudio>=2.0.0",
+@@ -34,4 +32,9 @@ setup(
+         "sounddevice>=0.5.0",
+         "soundfile>=0.12.0",
+     ],
++    # BVH import and headless processing do not load the standalone renderer.
++    # pyscreenrec 0.6 requires NumPy <2, so keep that constraint in its extra.
++    extras_require={
++        "standalone": ["raylib==5.5", "pyscreenrec==0.6"],
++    },
+ )

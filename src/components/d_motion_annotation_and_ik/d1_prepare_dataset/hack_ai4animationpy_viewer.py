@@ -1,6 +1,7 @@
 """AI4AnimationPy-only viewer hack: upstream BVH import, PyVista display.
 
-Run with the adjacent .venv/bin/python. Defaults to the downloaded MANN archive.
+Run with the repository-root .venv/bin/python (dependencies: uv sync).
+Defaults to the downloaded MANN archive.
 --list lists clips; --clip NAME selects an archive member; --bvh PATH opens a file.
 """
 
@@ -267,8 +268,8 @@ def main():
     parser.add_argument("--clip", default=DEFAULT_CLIP)
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
-    if Path(sys.prefix).resolve() != (HERE / ".venv").resolve():
-        raise RuntimeError(f"Use the dedicated interpreter: {HERE / '.venv/bin/python'}")
+    if Path(sys.prefix).resolve() != (ROOT / ".venv").resolve():
+        raise RuntimeError(f"Use the repository interpreter: {ROOT / '.venv/bin/python'}")
     if args.list:
         if args.bvh:
             parser.error("--list requires an archive")
