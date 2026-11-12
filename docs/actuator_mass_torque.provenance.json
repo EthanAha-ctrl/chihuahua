@@ -1,12 +1,12 @@
 {
   "input_blobs": {
     "ci/commit_preflight.py": "973351807884bf491b3d1e8e5bb36a8ed9d26f37",
-    "pyproject.toml": "327e8db85c987d8eddec647b92d5bd3d8901b227",
+    "pyproject.toml": "e8d7dd58b2a35ae69d43e100903056245b265d96",
     "src/components/z_common/plot_actuator_mass_torque.py": "c75ff21e36504398a362fe4606b1966c19c5abaf",
-    "uv.lock": "af9ec7ed9e4939fb55c3c159b4a9168697f4d095",
+    "uv.lock": "8f771209d855048ee911193e91e5c61f2e3eb07a",
     "vendor/components/joint/lists.md": "9f690e340c270392e726302b6f1492a1ad02622b",
     "vendor/components/motor/lists.md": "ad06b7caa73dab77dae2cac4b34501de8a710971"
   },
-  "output_blob": "09d8bbbe28714252d272e70e74f810e2394f81c9",
-  "source_base_commit": "557e85bb20e90345823f9cf1531508eff94e0258"
+  "output_blob": "fdf18476e288c8d9e440db838bbafc49caedb360",
+  "source_base_commit": "0133db1ee3bebcd35cc505c2658140cbec260226"
 }
