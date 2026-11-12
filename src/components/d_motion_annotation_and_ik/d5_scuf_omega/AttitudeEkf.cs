@@ -83,6 +83,11 @@ internal record AttitudeFrame(bool Ready,AttitudeQ Rotation,Vec3 Bias,string Sta
 // Reference: https://ntrs.nasa.gov/citations/20020060647
 internal sealed class AttitudeEkf(ImuScale scale)
 {
+    // Omega sensor -> PS axes is (-Y,-Z,X). PS axes are right/up/toward
+    // the user; display axes are right/forward/up, giving (-Y,-X,-Z).
+    // This proper rotation is pi about (1,-1,0); apply it to both sides
+    // of the relative rotation, so its input and output use the same basis.
+    private static readonly AttitudeQ SensorToDisplay=new(0,Math.Sqrt(.5),-Math.Sqrt(.5),0);
     private AttitudeQ q=AttitudeQ.Identity, reference=AttitudeQ.Identity;
     private Vec3 bias;
     private double[,] covariance=new double[6,6];
@@ -96,9 +101,14 @@ internal sealed class AttitudeEkf(ImuScale scale)
     // Conservative initial tuning. Physical units: radians, radians/s, g.
     private const double GyroNoise=.003, BiasWalk=.00015, GravityNoise=.02;
 
-    internal AttitudeFrame Snapshot()=>new(ready,ready?(q*reference.Conjugate()).Unit():AttitudeQ.Identity,
+    internal AttitudeFrame Snapshot()=>new(ready,ready?DisplayRotation(q,reference):AttitudeQ.Identity,
         bias,status,samplePeriod>0?1/samplePeriod:0,accepted,rejected,
         $"±{scale.AccelFullScaleG} g / ±{scale.GyroFullScaleDps}°/s · host timing");
+    // Express current body attitude in the initial body frame first. Using
+    // q*reference^-1 instead leaves the axis in the arbitrary world heading.
+    // The initial controller pose defines display zero, including its tilt.
+    internal static AttitudeQ DisplayRotation(AttitudeQ current,AttitudeQ initial)=>
+        (SensorToDisplay*initial.Conjugate()*current*SensorToDisplay.Conjugate()).Unit();
     internal long LastSample=>last;
 
     internal void Update(Vec3 rawGyro,Vec3 rawAccel,long timestamp)

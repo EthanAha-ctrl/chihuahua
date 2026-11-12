@@ -43,10 +43,16 @@ internal sealed partial class MonitorView
         dc.DrawLine(shaft,origin,head);
         dc.DrawLine(shaft,head,Project(tip*.80+transverse*.09));
         dc.DrawLine(shaft,head,Project(tip*.80-transverse*.09));
-        // Roll marker rotates in 3D with the same quaternion, not with the camera.
-        dc.DrawLine(new Pen(Blue,3),Project(tip*.60-transverse*.15),Project(tip*.60+transverse*.15));
+        // Distinct ends remove the previous marker's 180-degree ambiguity.
+        Point hub=Project(tip*.60),left=Project(tip*.60-transverse*.22),right=Project(tip*.60+transverse*.22);
+        var rightBrush=Brush("#FFB454");
+        dc.DrawLine(new Pen(Blue,3),left,hub);
+        dc.DrawLine(new Pen(rightBrush,3),hub,right);
+        dc.DrawEllipse(Blue,null,left,4,4);
+        dc.DrawEllipse(rightBrush,null,right,6,6);
         dc.DrawEllipse(arrowBrush,null,head,4,4);
         dc.DrawEllipse(Text,null,origin,3,3);
+        Label(dc,"L: blue   R: orange · initial pose = zero",1230,505,12,Muted,290);
         Label(dc,attitude.Status,1230,535,15,attitude.Ready?Green:Blue,290);
         Label(dc,$"qΔ  (w, x, y, z)\n{rotation.W,9:F4}   {rotation.X,9:F4}\n{rotation.Y,9:F4}   {rotation.Z,9:F4}",1230,582,16,Text,290);
         var b=attitude.Bias*(180/Math.PI);
