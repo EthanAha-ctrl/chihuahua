@@ -10,7 +10,7 @@ internal record TouchPoint(bool Active, int X, int Y);
 internal record Frame(Dictionary<string, ButtonState> Buttons, double[] Sticks, byte[] Triggers,
     short[] Motion, TouchPoint[] Touch, Dictionary<int, long> Reports, Dictionary<int, long> Arrivals,
     ButtonEvent[] Events, int QueuePeak, long Sequence, string Status, string? Error,
-    string Keyboard, string VendorNotice, double QueueDelayMs);
+    string Keyboard, string VendorNotice, double QueueDelayMs, AttitudeFrame Attitude);
 
 internal sealed class InputState
 {
@@ -37,7 +37,30 @@ internal sealed class InputState
     private int queuePeak;
     private string status = "Opening device…", keyboard = "--", notice = "--";
     private string? error;
+    private AttitudeEkf? attitude;
+    private long imuConfiguredAt;
     internal bool Ps { get; set; }
+
+    internal void ConfigureImu(ImuScale scale)
+    {
+        lock(gate)
+        {
+            if(attitude!=null) throw new InvalidOperationException("IMU scale already configured");
+            attitude=new AttitudeEkf(scale);
+            imuConfiguredAt=Stopwatch.GetTimestamp();
+        }
+    }
+    internal void CheckImuFreshness()
+    {
+        lock(gate)
+        {
+            if(attitude==null)return;
+            long at=attitude.LastSample==0?imuConfiguredAt:attitude.LastSample;
+            double limit=attitude.LastSample==0?3:.5;
+            if(Stopwatch.GetElapsedTime(at).TotalSeconds>limit)
+                throw new IOException("IMU stream stalled; orientation capture stopped, restart to recalibrate");
+        }
+    }
 
     internal void SetStatus(string value) { lock (gate) status = value; }
     internal void Fail(Exception e)
@@ -62,7 +85,7 @@ internal sealed class InputState
             var batch = events.ToArray(); events.Clear();
             return new(new(buttons), (double[])sticks.Clone(), (byte[])triggers.Clone(), (short[])motion.Clone(),
                 (TouchPoint[])touch.Clone(), new(reports), new(arrivals), batch, queuePeak, sequence,
-                status, error, keyboard, notice, delay);
+                status, error, keyboard, notice, delay,attitude?.Snapshot() ?? AttitudeFrame.Waiting);
         }
     }
     private static short I16(ReadOnlySpan<byte> r, int at) => BinaryPrimitives.ReadInt16LittleEndian(r[at..]);
@@ -100,6 +123,9 @@ internal sealed class InputState
                 SetTriggers(r[5], r[6], now);
                 for (int i = 0; i < 4; i++) sticks[i] = (r[1+i] - 127.5) / 127.5 * (i % 2 == 1 ? -1 : 1);
                 for (int i = 0; i < 6; i++) motion[i] = I16(r, 16 + i*2);
+                // PS firmware emits (-sensorY,-sensorZ,sensorX); undo this
+                // proper axis rotation so both modes use the same MEKF frame.
+                UpdateAttitude(new(motion[2],-motion[0],-motion[1]),new(motion[5],-motion[3],-motion[4]),now);
                 for (int i = 0; i < 2; i++) { int p = 32+i*4; touch[i] = new((r[p]&128)==0, r[p+1]|(r[p+2]&15)<<8, (r[p+2]>>4)|r[p+3]<<4); }
             }
             else if (!Ps && source == 0)
@@ -111,6 +137,7 @@ internal sealed class InputState
                 {
                     Require(p.Length==16, "Invalid IMU payload length");
                     for (int i=0;i<3;i++) { motion[i]=I16(p,10+i*2); motion[i+3]=I16(p,4+i*2); }
+                    UpdateAttitude(new(motion[0],motion[1],motion[2]),new(motion[3],motion[4],motion[5]),now);
                 }
                 else notice = $"0x{id:X2}: {Convert.ToHexString(p)}"; // Visible diagnostics, no guessed semantics.
             }
@@ -133,6 +160,11 @@ internal sealed class InputState
             }
             else notice = $"IF {source}: {Convert.ToHexString(report)}";
         }
+    }
+    private void UpdateAttitude(Vec3 gyro,Vec3 accel,long timestamp)
+    {
+        if(attitude==null) throw new IOException("IMU sample arrived before physical scales were configured");
+        attitude.Update(gyro,accel,timestamp);
     }
     private void SetTriggers(byte left, byte right, long now)
     {

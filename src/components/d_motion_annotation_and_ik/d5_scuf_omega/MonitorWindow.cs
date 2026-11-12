@@ -18,7 +18,7 @@ internal sealed class MonitorWindow : Window
     internal MonitorWindow()
     {
         Title="SCUF Omega — Avalonia / native HID";
-        Width=1200; Height=900; MinWidth=840; MinHeight=650;
+        Width=1500; Height=900; MinWidth=1040; MinHeight=650;
         Background=new SolidColorBrush(Color.Parse("#101722"));
         Content=view;
         capture=new(state);
@@ -52,7 +52,7 @@ internal sealed class MonitorWindow : Window
     }
 }
 
-internal sealed class MonitorView : Control
+internal sealed partial class MonitorView : Control
 {
     private static readonly IBrush Text=Brush("#E3EDF7"), Muted=Brush("#94A9C2"), Green=Brush("#59E3A5"),
         Blue=Brush("#72BBFF"), Panel=Brush("#192435"), Idle=Brush("#324358"), Red=Brush("#FF6262");
@@ -90,7 +90,7 @@ internal sealed class MonitorView : Control
     {
         base.Render(context); renders++;
         if (Bounds.Width<=0 || Bounds.Height<=0) return;
-        double scale=Math.Min(Bounds.Width/1200,Bounds.Height/850);
+        double scale=Math.Min(Bounds.Width/1560,Bounds.Height/850);
         using var transform=context.PushTransform(Matrix.CreateScale(scale,scale));
         if (frame==null) { Label(context,"Opening native input…",30,30,24,Text); return; }
         Label(context,$"OMEGA   {(ps?"PS":"PC")} MODE",30,24,26,Text);
@@ -125,6 +125,7 @@ internal sealed class MonitorView : Control
         Label(context,string.Join("   |   ",frame.Reports.OrderBy(x=>x.Key).Select(x=>$"IF{x.Key}: {x.Value} reports"))+$"   |   {frame.Sequence} button edges",30,749,14,Muted);
         Label(context,string.Join("   ·   ",recent),30,774,14,Text);
         Label(context,"Vendor: "+frame.VendorNotice,30,799,12,Muted);
+        DrawAttitude(context,frame.Attitude);
         if (frame.Error!=null)
         {
             context.DrawRectangle(Brush("#401C28"),new Pen(Red,2),new Rect(20,145,1160,110),8,8);

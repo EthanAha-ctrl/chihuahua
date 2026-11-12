@@ -53,7 +53,7 @@ internal static class Wire
     }
     internal static byte[] Request(byte session, ushort command, ReadOnlySpan<byte> payload)
     {
-        if (command is not (0 or 1 or 0x59 or 0x77 or 0x78)) throw new ArgumentException("Command outside verified allowlist");
+        if (command is not (0 or 1 or 0x58 or 0x59 or 0x77 or 0x78)) throw new ArgumentException("Command outside verified allowlist");
         byte[] p = new byte[6 + payload.Length];
         p[0] = 0x88; p[1] = (byte)(1 | session << 4);
         BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(2), command);
@@ -72,6 +72,7 @@ internal static class Wire
 internal sealed class VendorProtocol(IntPtr device, Action<byte[]> notification)
 {
     internal byte Session { get; private set; }
+    internal ImuScale? Scale { get; private set; }
     private byte? restoreTouch;
     private bool imu;
 
@@ -94,11 +95,18 @@ internal sealed class VendorProtocol(IntPtr device, Action<byte[]> notification)
         }
         throw new TimeoutException($"Vendor command {command:X2} timed out");
     }
-    internal void Start()
+    internal void Start(bool pcMode = true, Action<ImuScale>? configured = null)
     {
         byte[] response = Request(0, 0x78, 0x56, 0x34, 0x12);
         if (response.Length != 5 || response[0] is < 1 or > 15) throw new IOException("Invalid vendor session ID");
         Session = response[0];
+        // Firmware 2.18.431 handler 0x0e050ce8 reads QMI CTRL2/CTRL3 FS bits.
+        // Response: accel FS x/y/z, gyro FS x/y/z, gyro ODR. Read-only command.
+        byte[] config = Request(0x58);
+        Scale = ImuScale.FromRegisters(config);
+        configured?.Invoke(Scale);
+        Console.WriteLine($"IMU scale: ±{Scale.AccelFullScaleG} g, ±{Scale.GyroFullScaleDps} deg/s; host monotonic timestamps");
+        if (!pcMode) return;
         byte[] touch = Request(0x77);
         if (touch.Length != 1 || touch[0] > 1) throw new IOException("Invalid touch switch response");
         if (touch[0] == 0) { restoreTouch = 0; Request(0x78, 1); }

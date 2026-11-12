@@ -49,10 +49,11 @@ internal sealed class Capture(InputState state)
                 if (handle==IntPtr.Zero) throw new IOException($"Open IF {info.Interface}: {Native.HidError(handle)}. Grant Input Monitoring to the launching application.");
                 if (!handles.TryAdd(info.Interface,handle)) { Native.hid_close(handle); throw new IOException("Duplicate HID interface"); }
             }
+            int vendorInterface=state.Ps?1:0;
+            vendor=new(handles[vendorInterface], raw=>state.Accept(vendorInterface,raw));
+            vendor.Start(!state.Ps,state.ConfigureImu);
             if (!state.Ps)
             {
-                vendor=new(handles[0], raw=>state.Accept(0,raw));
-                vendor.Start();
                 Native.UsbCheck(Native.libusb_init(out context),"libusb init");
                 usb=Native.libusb_open_device_with_vid_pid(context,0x1B1C,0x3A28);
                 if (usb==IntPtr.Zero) throw new IOException("Cannot open Omega PC USB device");
@@ -67,6 +68,7 @@ internal sealed class Capture(InputState state)
                     {
                         byte[] r=Native.Read(handle);
                         if (r.Length!=0) state.Accept(number,r,vendor?.Session ?? 0);
+                        if(number==0) state.CheckImuFreshness();
                     }
                 }),CancellationToken.None,TaskCreationOptions.LongRunning,TaskScheduler.Default));
             }
