@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <OmegaNative>$(MSBuildProjectDirectory)/../../../../.tools/omega-native</OmegaNative>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.23" />
+    <Content Include="$(OmegaNative)/libhidapi.dylib" Link="libhidapi.dylib" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(OmegaNative)/libusb-1.0.dylib" Link="libusb-1.0.dylib" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CheckNativeLibraries" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(OmegaNative)/libhidapi.dylib') Or !Exists('$(OmegaNative)/libusb-1.0.dylib')" Text="Run ./build_native.zsh in d5_scuf_omega before building." />
+  </Target>
+</Project>
